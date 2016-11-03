@@ -1,0 +1,11 @@
+[Unit]
+Description=Polapi
+After=local-fs.target
+
+[Service]
+Type=oneshot
+PIDFile=/var/run/polapi.pid
+ExecStart=/usr/bin/python /home/pi/polapi/polapi.py
+
+[Install]
+WantedBy=basic.target

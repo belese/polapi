@@ -22,179 +22,237 @@
 #
 #
 
-from threading import Thread,Timer
+from threading import Thread, Event, Lock
 import time
+
 
 import RPi.GPIO as Gpio
 import Adafruit_MPR121.MPR121 as mpr121
-try :
+
+try:
     from resources.utils import log
-except :
-    def log(value) :
+    from resources.resource import Resource, queue_call
+except BaseException:
+    from resource import Resource, queue_call
+
+    def log(value):
         print value
 
 Gpio.setmode(Gpio.BCM)
 
-#LONGPRESSCBFN
-LONGPRESS = 3
 
-#DELAY between shutter
-DELAY = 4
-
-#don't change value behind this
-
+# BUTTON TYPE
 MPR121 = 0
 GPIO = 1
 
-#GPIO PIN ID
-DECLENCHEUR = 4  #gpio
+# EVENTS
+ONTOUCHED = 1
+ONPRESSED = 2
+ONRELEASED = 3
 
 
-#MPR121 PIN ID
-AUTO = 2
-LUM = 1
-FORMAT = 0
-
-VALUE0 = 3
-VALUE1 = 4
-VALUE2 = 5
-VALUE3 = 6
-
-def register_gpio(gpio,fn) :
-    print 'register gpio ',gpio
+def register_gpio(gpio, fn):
     Gpio.setup(gpio, Gpio.IN, pull_up_down=Gpio.PUD_UP)
-    Gpio.add_event_detect(gpio, Gpio.BOTH, callback=fn,bouncetime=10)
+    Gpio.add_event_detect(gpio, Gpio.BOTH, callback=fn, bouncetime=10)
 
-class GpioPi :
-    def __init__(self,onPress,onRelease) :
-        self.onPress = onPress
-        self.onRelease = onRelease
 
-    def register(self,gpioid) :
-        register_gpio(gpioid,self._onPress)
+class GpioPi:
+    def __init__(self, ONPRESSED, ONRELEASED):
+        self.ONPRESSED = ONPRESSED
+        self.ONRELEASED = ONRELEASED
 
-    def _onPress(self,gpioid) :
-        if not Gpio.input(gpioid):            
-            self.onPress(GPIO,gpioid)
-        else:            
-            self.onRelease(GPIO,gpioid)
+    def register(self, gpioid):
+        register_gpio(gpioid, self._onPress)
 
-class Mpr121 :
-    def __init__(self,onPress,onRelease) :
-        self.onPress = onPress
-        self.onRelease = onRelease
+    def _onPress(self, gpioid):
+        if not Gpio.input(gpioid):
+            self.ONPRESSED(GPIO, gpioid)
+        else:
+            self.ONRELEASED(GPIO, gpioid)
+
+    def stop(self):
+        Gpio.cleanup()
+
+
+class Mpr121:
+    def __init__(self, ONPRESSED, ONRELEASED):
+        self.stopped = False
+        self.ONPRESSED = ONPRESSED
+        self.ONRELEASED = ONRELEASED
         self.cap = mpr121.MPR121()
         if not self.cap.begin():
             log('Failed to initialize MPR121')
         self.registerPinId = []
         Thread(None, self.mpr121, None).start()
 
-    def register(self,pinid) :
+    def register(self, pinid):
         self.registerPinId.append(pinid)
 
-    def mpr121(self) :
-       last_touched = self.cap.touched()
-       while True:
-           current_touched = self.cap.touched()
-           if current_touched != last_touched :
-               for i in self.registerPinId:
+    def mpr121(self):
+        last_touched = self.cap.touched()
+        while not self.stopped:
+            current_touched = self.cap.touched()
+            if current_touched != last_touched:
+                for i in self.registerPinId:
                     pin_bit = 1 << i
                     if current_touched & pin_bit and not last_touched & pin_bit:
-                        log('{0} touched!'.format(i))
-                        if self.onPress :
-                            self.onPress(MPR121,i)
+                        if self.ONPRESSED:
+                            self.ONPRESSED(MPR121, i)
                     if not current_touched & pin_bit and last_touched & pin_bit:
-                        log('{0} released!'.format(i))
-                        if self.onRelease :
-                            self.onRelease(MPR121,i)
-               last_touched = current_touched
-           time.sleep(0.1)
+                        if self.ONRELEASED:
+                            self.ONRELEASED(MPR121, i)
+                last_touched = current_touched
+            time.sleep(0.1)
+        print ('Mpr121 Stopped')
 
-class Button :
-    def __init__(self,onPress,onLongPress=None) :
+    def stop(self):
+        self.stopped = True
+
+
+class Button(Resource):
+    def __init__(self):
+        Resource.__init__(self)
         self.state = True
-        self.value = False
-        self.onPress = onPress
-        self.onLongPress = onLongPress
-        self.onLongPressTimer = None
-        self.pressTime = 0
-        self.done = True
+        self.events = {ONTOUCHED: [], ONPRESSED: [], ONRELEASED: []}
+        self.buttonPressed = Event()
+        self.buttonPressed.clear()
+        self.buttonRelease = Event()
+        self.buttonRelease.set()
+        self.lock = Lock()
+        self.lockStatus = Lock()
+        self.thread = Thread(target=self._callEvent)
+        self.thread.start()
 
-    def enable(self) :
-        self.state = True
+    def stop(self):
+        Resource.stop(self)
+        self.disable()
+        self.buttonPressed.set()
 
-    def disable(self) :
-        self.state = False
+    def registerEvent(self, cb, event, delay=0, *args, **kwargs):
+        self.events[event].append((cb, delay, args, kwargs))
+        if event == ONPRESSED:
+            self.events[ONPRESSED].sort(key=lambda colonnes: colonnes[1])
 
-    def status(self) :
-        return self.state
+    def enable(self):
+        with self.lockStatus:
+            self.state = True
 
-    def _onPress(self) :        
-        self.done = False
-        self.value = True
-        self.pressTime = time.time()
-        if self.onPress and self.state and not self.onLongPress:
-            self.onPress()
-            self.done = True
-        elif self.onLongPress and self.state:         
-            self.onLongPressTimer = Timer(LONGPRESS, self.onLongPressTO)
-            self.onLongPressTimer.start()
-            
-    def onLongPressTO(self) :
-        self.onLongPressTimer = None
-        if self.value and self.state:
-            self.done = True
-            self.onLongPress()
-        
-    def _onRelease(self) :
-        self.value = False
-        if self.onLongPressTimer :
-            self.onLongPressTimer.cancel()
-            self.onLongPressTimer = None
-        if self.onLongPress and self.state and not self.done:
-            self.done = True
-            self.onPress()
+    def disable(self):
+        with self.lockStatus:
+            self.state = False
 
-class Buttons :
-    def __init__(self) :
-        self.gpio = GpioPi(self.onPress,self.onRelease)
-        self.mpr = Mpr121(self.onPress,self.onRelease)
-        self.buttons = {MPR121:{},GPIO:{}}
+    def status(self):
+        with self.lockStatus:
+            return self.state
 
-    def register(self,type,btn,cbOnPress=None,cbOnLongPress=None):
-        if not self.buttons[type].has_key(btn) :
-             self.buttons[type][btn] = []
-             if type == GPIO :
+    def _callEvent(self):
+        while not self.terminated:
+            self.buttonPressed.wait()
+            with self.lock:
+                if not self.status():
+                    #event is not enable
+                    self.buttonRelease.wait()
+                    self.buttonPressed.clear()
+                    continue
+                pressTime = time.time()
+                map(self.onEvent, self.events[ONTOUCHED])
+                for i, event in enumerate(self.events[ONPRESSED]):
+                    wait = event[1] - (time.time() - pressTime)
+                    if wait < 0:
+                        wait = 0
+                    if not self.buttonRelease.wait(wait):
+                        if event == self.events[ONPRESSED][-1]:
+                            self.onEvent(event)
+                    elif wait == 0:
+                        self.onEvent(self.events[ONPRESSED][i])
+                        break
+                    elif i > 0:
+                        # button was released, call previous on pressed if
+                        # exist.
+                        self.onEvent(self.events[ONPRESSED][i - 1])
+                        break
+                self.buttonRelease.wait()
+                map(self.onEvent, self.events[ONRELEASED])
+                self.buttonPressed.clear()
+        print ('button thread Terminated')
+
+    def onEvent(self, event):
+        event[0](*event[2], **event[3])
+
+    @queue_call
+    def _onPress(self):
+        with self.lock:
+            self.buttonRelease.clear()
+            self.buttonPressed.set()
+
+    @queue_call
+    def _onRelease(self):
+        self.buttonRelease.set()
+
+
+class Buttons:
+
+    def __init__(self):
+        self.gpio = GpioPi(self.ONPRESSED, self.ONRELEASED)
+        self.mpr = Mpr121(self.ONPRESSED, self.ONRELEASED)
+        self.buttons = {MPR121: {}, GPIO: {}}
+
+    def register(self, type, btn):
+        if btn not in self.buttons[type]:
+            self.buttons[type][btn] = []
+            if type == GPIO:
                 self.gpio.register(btn)
-             elif type == MPR121 :
+            elif type == MPR121:
                 self.mpr.register(btn)
-        self.buttons[type][btn].append(Button(cbOnPress,cbOnLongPress))
+        self.buttons[type][btn].append(Button())
         return self.buttons[type][btn][-1]
 
-    def onPress(self,type,btn) :
-        print "i'm here",type,btn,self.buttons[type]
-        if self.buttons[type].has_key(btn) :
-            for btn in self.buttons[type][btn] :
+    def ONPRESSED(self, type, btn):
+        if btn in self.buttons[type]:
+            for btn in self.buttons[type][btn]:
                 btn._onPress()
 
-    def onRelease(self,type,btn) :
-        if self.buttons[type].has_key(btn) :
-            for btn in self.buttons[type][btn] :
+    def ONRELEASED(self, type, btn):
+        if btn in self.buttons[type]:
+            for btn in self.buttons[type][btn]:
                 btn._onRelease()
+
+    def stop(self):
+        for type in self.buttons.keys():
+            for id in self.buttons[type].keys():
+                for btn in self.buttons[type][id]:
+                    btn.stop()
+        self.gpio.stop()
+        self.mpr.stop()
+
 
 BUTTONS = Buttons()
 
 
 def main(args):
-    def touch() :
+    def touch():
         print "touched"
-    def longpress() :
+
+    def longpress():
         print "LongPress"
 
-    for i in range(7) :
-        BUTTONS.register(MPR121,i,touch,longpress)
-    BUTTONS.register(GPIO,DECLENCHEUR,touch,longpress)
+    def verylongpress():
+        print "veryLongPress"
 
+    def press(val=0):
+        print "press", val
+
+    def release():
+        print "release"
+
+    AUTO = BUTTONS.register(MPR121, 0)
+    AUTO.registerEvent(press, ONPRESSED, 0, 2)
+    AUTO.registerEvent(longpress, ONPRESSED, 2)
+    AUTO.registerEvent(verylongpress, ONPRESSED, 4)
+    AUTO.registerEvent(touch, ONTOUCHED)
+    AUTO.registerEvent(release, ONRELEASED)
+
+    print ('done')
 
 
 if __name__ == '__main__':

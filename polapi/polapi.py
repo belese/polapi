@@ -2,227 +2,439 @@
 # -*- coding: utf-8 -*-
 #
 #  polapi_v2.py
-#  
+#
 #  Copyright 2017 belese <belese@belese>
-#  
+#
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
 #  the Free Software Foundation; either version 2 of the License, or
 #  (at your option) any later version.
-#  
+#
 #  This program is distributed in the hope that it will be useful,
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  
+#
 #  You should have received a copy of the GNU General Public License
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA 02110-1301, USA.
-#  
-#  
-from threading import Timer
+#
+#
+import signal
+import sys
+import threading
+import time
+from PIL import Image, ImageEnhance
 
 from resources.printer import PRINTER
-from resources.buttons import GPIO,MPR121,BUTTONS,DECLENCHEUR,AUTO,LUM,FORMAT,VALUE0,VALUE1,VALUE2,VALUE3
-from resources.camera import CAMERA
-from resources.utils import log,blackandwhite,clahe,histogramme,toFile
-import resources.vibrator as BUZZ
+from resources.buttons import GPIO, MPR121, BUTTONS, ONTOUCHED, ONPRESSED, ONRELEASED
+from resources.camera import CAMERA, SCAN_MODE, SCAN_MODE_FIX, SCAN_MODE_LIVE
+from resources.vibrator import BUZZ
 
-#TMP PHOTO FILE
-FILE = "/tmp/photo.png"
+from resources.log import LOG
 
-#default mode timeout
+log = LOG.log
+
+
+# GPIO PIN ID
+DECLENCHEUR = 4  # gpio
+
+# MPR121 PIN ID
+AUTO = 2
+LUM = 1
+FORMAT = 0
+
+VALUE0 = 3
+VALUE1 = 4
+VALUE2 = 5
+VALUE3 = 6
+
+# default mode timeout
 TIMEOUT = 3
-#Luminosity Option
+# Luminosity Option
 LOW = 10
 MEDIUM_LOW = 11
 MEDIUM_HIGH = 12
 HIGH = 13
 
-#FORMAT OPTION (camera setting,printer settings)
-IDENTITY = ((419,544),"X48MMY37MM")
-SQUARE = ((544,544),"X48MMY48MM")
-STANDARD = ((724,544),"X48MMY64MM")
-PANO = ((1448,544),"X48MMY128MM")
-
-#CAMERA SETTINGS
-SETTINGS = {
-			AUTO : {"sharpness" : 0,
-					"contrast" : 0,
-					"brightness" : 50,
-                    "saturation" : 0,
-                    "drc_strength" : "off",
-					"ISO" : 0,				
-					"exposure_compensation" : 0,
-					"exposure_mode" : 'auto',
-					"meter_mode" : 'average',
-					"awb_mode" : 'auto',
-					},
-			LOW : {"sharpness" : 0,
-					"contrast" : 0,
-					"brightness" : 70,
-                    "saturation" : 0,
-                    "drc_strength" : "high",
-					"ISO" : 800,				
-					"exposure_compensation" : 0,
-					"exposure_mode" : 'night',
-					"meter_mode" : 'average',
-					"awb_mode" : 'incandescent',
-					},
-			MEDIUM_LOW : {"sharpness" : 0,
-					"contrast" : 0,
-					"brightness" : 60,
-                    "saturation" : 0,
-					"ISO" : 600,				
-					"exposure_compensation" : 0,
-					"exposure_mode" : 'auto',
-					"meter_mode" : 'average',
-					"drc_strength" : "medium",
-					"awb_mode" : 'shade',
-					},
-			MEDIUM_HIGH : {"sharpness" : 0,
-					"contrast" : 0,
-					"brightness" : 50,
-                    "saturation" : 0,
-					"ISO" : 300,				
-					"exposure_compensation" : 0,
-					"exposure_mode" : 'auto',
-					"meter_mode" : 'average',
-					"drc_strength" : "low",
-					"awb_mode" : 'cloudy',
-					},
-			HIGH : {"sharpness" : 0,
-					"contrast" : 0,
-					"brightness" : 50,
-                    "saturation" : 0,
-					"ISO" : 100,				
-					"exposure_compensation" : 0,
-					"exposure_mode" : 'auto',
-					"meter_mode" : 'average',
-					"drc_strength" : "off",
-					"awb_mode" : 'sunlight',
-					}
-			}
-
-class polapi :
-	
-	LUMINOSITY =0
-	FORMAT = 1
-	
-	def __init__(self) :		
-		self.timer = None				
-		
-		#register all buttons
-		self.declencheur = BUTTONS.register(GPIO,DECLENCHEUR,self.takePhoto)
-		self.auto = BUTTONS.register(MPR121,AUTO,self.onAuto,self.onChangeMode)
-		self.lum = BUTTONS.register(MPR121,LUM,self.onLuminosity)
-		self.bsize = BUTTONS.register(MPR121,FORMAT,self.onFormat)
-		self.value0 = BUTTONS.register(MPR121,VALUE0,self.onValue0)		
-		self.value1 = BUTTONS.register(MPR121,VALUE1,self.onValue1)		
-		self.value2 = BUTTONS.register(MPR121,VALUE2,self.onValue2)
-		self.value3 = BUTTONS.register(MPR121,VALUE3,self.onValue3)				
-		self.mode = None
-		self.onValue(AUTO,STANDARD)
-		self.prt = PRINTER
-		BUZZ.vibrator(BUZZ.READY)
-	
-	
-	def takePhoto(self) :
-		log ("Take a photo")
-		BUZZ.vibrator(BUZZ.TOUCHED)
-		img = CAMERA.takePicture()
-		img = self.postProcess(img)				
-		self.prt.print_img(toFile(img,FILE),self.size[1])
-	
-	def postProcess(self,img) :
-		img = blackandwhite(img)		
-		if self.luminosity > MEDIUM_HIGH :
-			return clahe(img)
-		else :
-			return histogramme(img)
-			
-	def onAuto(self) :		
-		#short press, Return to AUTO MODE
-		log ("Reset settings to auto")
-		BUZZ.vibrator(BUZZ.TOUCHED)
-		self.mode = None
-		self.onValue(AUTO,STANDARD)
-		
-	def onChangeMode(self) :
-		print ("On Other mode")		
-		
-	def idle(self) :		
-		self.value0.disable()
-		self.value1.disable()
-		self.value2.disable()
-		self.value3.disable()
-		self.mode = None
-		
-	def wait(self) :
-		self.value0.enable()
-		self.value1.enable()
-		self.value2.enable()
-		self.value3.enable()
-		self.enableTo(TIMEOUT)
-
-	def onFormat(self) :
-		BUZZ.vibrator(BUZZ.TOUCHED)				
-		self.mode = self.FORMAT
-		self.wait()
-	
-	def onLuminosity(self) :
-		BUZZ.vibrator(BUZZ.TOUCHED)
-		self.mode = self.LUMINOSITY
-		self.wait()
-		
-	def onValue0(self) :
-		BUZZ.vibrator(BUZZ.OK)
-		self.onValue(LOW,IDENTITY)
-						
-	def onValue1(self) :
-		BUZZ.vibrator(BUZZ.OK)		
-		self.onValue(MEDIUM_LOW,SQUARE)
-		
-	def onValue2(self) :
-		BUZZ.vibrator(BUZZ.OK)		
-		self.onValue(MEDIUM_HIGH,STANDARD)
-			
-	def onValue3(self) :
-		BUZZ.vibrator(BUZZ.OK)		
-		self.onValue(HIGH,PANO)
-	
-	def onValue(self,lum,size) :						
-		if self.timer : self.timer.cancel()
-		if self.mode in (self.LUMINOSITY,None) :
-			log ("Set luminosity to %d"%lum)
-			self.luminosity  = lum
-			CAMERA.setLuminosity(SETTINGS[lum])
-		if self.mode in (self.FORMAT,None) :
-			self.size = size
-			log ("Set format to ",size[0])
-			CAMERA.setFormat(size[0])		
-		self.idle()
-	
-	def enableTo(self,delay) :	
-		if self.timer :
-			self.timer.cancel()	
-		self.timer = Timer(delay, self.onTimeout, ())
-		self.timer.start()
-	
-	def onTimeout(self) :
-		self.timer = None
-		BUZZ.vibrator(BUZZ.CANCEL)
-		self.idle()
+#Buzzer (DutyCycle,time)
+OK = ((1, 0.2), (0, 0.1), (1, 0.2), (0, 0.1))
+READY = ((1, 0.3), (0, 0.3), (1, 0.3), (0, 0.3), (1, 0.3))
+CANCEL = ((1, 0.1), (0, 0.1))
+TOUCHED = ((1, 0.25), (0, 0.1))
+def REPEAT(x): return ((1, 0.2), (0, 0.1)) * x
 
 
-def main(args):
-    import time
-    a = polapi()
-    time.sleep(100)
-    return 0
+# FORMAT OPTION
+IDENTITY = (296, 384)
+SQUARE = (384, 384)
+STANDARD = (576, 384)
+PANO = (1152, 384)
 
-if __name__ == '__main__':
-    import sys
-    sys.exit(main(sys.argv))
+# CAMERA SETTINGS
+LUMDEFAULT = {"sharpness": 0,
+              "contrast": 0,
+              "brightness": 50,
+              "saturation": 0,
+              "drc_strength": "off",
+              "ISO": 0,
+              "exposure_compensation": 0,
+              "exposure_mode": 'auto',
+              "meter_mode": 'average',
+              "awb_mode": 'auto',
+              }
+LUMLOW = {"sharpness": 0,
+          "contrast": 50,
+          "brightness": 70,
+          "saturation": 0,
+          "drc_strength": "high",
+          "ISO": 800,
+          "exposure_compensation": 0,
+          "exposure_mode": 'night',
+          "meter_mode": 'average',
+          "awb_mode": 'incandescent',
+          }
 
+LUMMEDIUM = {"sharpness": 0,
+             "contrast": 20,
+             "brightness": 60,
+             "saturation": 0,
+             "ISO": 600,
+             "exposure_compensation": 0,
+             "exposure_mode": 'auto',
+             "meter_mode": 'average',
+             "drc_strength": "medium",
+             "awb_mode": 'shade',
+             }
+
+LUMMEDIUMHIGH = {"sharpness": 0,
+                 "contrast": 0,
+                 "brightness": 50,
+                 "saturation": 0,
+                 "ISO": 300,
+                 "exposure_compensation": 0,
+                 "exposure_mode": 'auto',
+                 "meter_mode": 'average',
+                 "drc_strength": "low",
+                 "awb_mode": 'cloudy',
+                 }
+LUMHIGH = {"sharpness": 0,
+           "contrast": 0,
+           "brightness": 50,
+           "saturation": 0,
+           "ISO": 100,
+           "exposure_compensation": 0,
+           "exposure_mode": 'auto',
+           "meter_mode": 'average',
+           "drc_strength": "off",
+           "awb_mode": 'sunlight',
+           }
+
+BTNSHUTTER = BUTTONS.register(GPIO, DECLENCHEUR)
+BTNAUTO = BUTTONS.register(MPR121, AUTO)
+BTNLUM = BUTTONS.register(MPR121, LUM)
+BTNSIZE = BUTTONS.register(MPR121, FORMAT)
+BTNVAL0 = BUTTONS.register(MPR121, VALUE0)
+BTNVAL1 = BUTTONS.register(MPR121, VALUE1)
+BTNVAL2 = BUTTONS.register(MPR121, VALUE2)
+BTNVAL3 = BUTTONS.register(MPR121, VALUE3)
+BTNSLITSCANMODE = BUTTONS.register(MPR121, VALUE0)
+
+
+class mode:
+    def setMode(self, value):
+        pass
+
+    def postProcess(self, img):
+        return img
+
+
+class luminosity(mode):
+    def __init__(self):
+        self.values = [LUMLOW, LUMMEDIUM, LUMMEDIUMHIGH, LUMHIGH, LUMDEFAULT]
+        self.value = -1
+        self.postvalue = ([1.5, 1.2], [1.2, 1.3], [
+                          1, 1.5], [0.8, 1.6], [1.2, 1.5])
+
+    def setMode(self, value):
+        log("Select Luminosity %d" % value)
+        self.value = value
+        CAMERA.setLuminosity(self.values[value])
+
+    def postProcess(self, img):
+        log("Luminosity post process")
+        # img.save('original.jpg')
+        img = ImageEnhance.Color(img)
+        img = img.enhance(0)
+        # img.save('bw.jpg')
+        img = ImageEnhance.Brightness(img)
+        img = img.enhance(self.postvalue[self.value][0])
+        # img.save('brightness.jpg')
+        img = ImageEnhance.Contrast(img)
+        img = img.enhance(self.postvalue[self.value][1])
+        return img
+
+
+class size(mode):
+    def __init__(self):
+        self.values = [IDENTITY, SQUARE, STANDARD, PANO, STANDARD]
+        self.value = -1
+
+    def setMode(self, value):
+        log("Select Mode %d" % value)
+        self.value = value
+        if value == 0:
+            value += 1
+        CAMERA.setSettings({'resolution': self.values[value]})
+
+    def postProcess(self, img):
+        log("Format post process")
+        resolution = self.values[self.value]
+        # resize, crop and rotate image before printing
+        img_ratio = img.size[0] / float(img.size[1])
+        ratio = resolution[0] / float(resolution[1])
+        if ratio > img_ratio:
+            img = img.resize(
+                (resolution[0], int(
+                    resolution[0] * img.size[1] / img.size[0])), Image.ANTIALIAS)
+            box = (int((img.size[0] - resolution[0]) / 2), 0,
+                   int((img.size[0] + resolution[0]) / 2), img.size[1])
+            img = img.crop(box)
+        elif ratio < img_ratio:
+            img = img.resize(
+                (int(
+                    resolution[1] *
+                    img.size[0] /
+                    img.size[1]),
+                    resolution[1]),
+                Image.ANTIALIAS)
+            box = (int((img.size[0] - resolution[0]) / 2), 0,
+                   int((img.size[0] + resolution[0]) / 2), img.size[1])
+            img = img.crop(box)
+        else:
+            img = img.resize((resolution[0], resolution[1]), Image.ANTIALIAS)
+        return img.rotate(90, expand=1)
+
+
+class effect(mode):
+    def __init__(self):
+        self.values = ['gpen', 'cartoon', 'pastel', 'oilpaint', 'none']
+        self.value = -1
+
+    def setMode(self, value):
+        log("Set effect to %d" % value)
+        CAMERA.setSettings({'image_effect': self.values[value]})
+
+
+class shader(mode):
+    pass
+
+
+class polapi:
+    def __init__(self):
+        log('Enter in Polapi Main Application')
+        self.timer = threading.Event()
+        self.timeoutset = threading.Event()
+        self.imageReady = threading.Event()
+        self.lockTimer = threading.Lock()
+        self.lock = False
+        self.mode = -1
+        self.lastmode = -1
+        self.picture = None
+        self.printID = None
+        self.modes = [luminosity(), size(), effect(), shader()]
+        for mode in self.modes:
+            mode.setMode(self.mode)
+        self.buttons = [BTNVAL0, BTNVAL1, BTNVAL2, BTNVAL3]
+        for button in self.buttons:
+            button.disable()
+        self.slitscanmode = SCAN_MODE
+        self.slitscanobject = None
+        self.slitscan = False
+        self.stopped = False
+        threading.Thread(target=self.timeout).start()
+
+        BTNSHUTTER.registerEvent(self.onShutterTouched, ONTOUCHED)
+        BTNSHUTTER.registerEvent(self.onPhoto, ONPRESSED)
+        BTNSHUTTER.registerEvent(self.onSlitScan, ONPRESSED, 1)
+        BTNSHUTTER.registerEvent(self.onStopSlitScan, ONRELEASED)
+
+        BUZZ.buzz(READY)
+
+        BTNAUTO.registerEvent(self.onAuto, ONPRESSED)
+        BTNAUTO.registerEvent(self.onlock, ONPRESSED, 3)
+        BTNLUM.registerEvent(self.onModeSelect, ONPRESSED, 0, 0)
+        BTNLUM.registerEvent(self.onModeSelect, ONPRESSED, 2, 2)
+        BTNSIZE.registerEvent(self.onModeSelect, ONPRESSED, 0, 1)
+        BTNSIZE.registerEvent(self.onModeSelect, ONPRESSED, 2, 3)
+
+        BTNAUTO.registerEvent(self.ontouched, ONTOUCHED)
+        BTNLUM.registerEvent(self.ontouched, ONTOUCHED)
+        BTNSIZE.registerEvent(self.ontouched, ONTOUCHED)
+
+        BTNSLITSCANMODE.registerEvent(self.onSlitScanMode, ONPRESSED, 4)
+        BTNSLITSCANMODE.registerEvent(self.ontouched, ONTOUCHED)
+
+        for i, btn in enumerate(self.buttons):
+            btn.registerEvent(self.onValue, ONPRESSED, 0, i)
+            if btn != BTNVAL0:
+                # BTNVAL0 already registere with BTNSLITSCANMODE
+                btn.registerEvent(self.ontouched, ONTOUCHED)
+
+        CAMERA.register(self.onCameraEvent)
+        PRINTER.register(self.onPrinterEvent)
+
+    def onSlitScanMode(self):
+        if self.slitscanmode == SCAN_MODE:
+            log("Select Scan mode fix")
+            self.slitscanmode = SCAN_MODE_FIX
+            BUZZ.buzz(REPEAT(1))
+        elif self.slitscanmode == SCAN_MODE_FIX:
+            log("Select Scan mode live")
+            self.slitscanmode = SCAN_MODE_LIVE
+            BUZZ.buzz(REPEAT(2))
+        elif self.slitscanmode == SCAN_MODE_LIVE:
+            log("Select Scan mode")
+            self.slitscanmode = SCAN_MODE
+            BUZZ.buzz(REPEAT(3))
+
+    def onShutterTouched(self):
+        log("Shutter touched")
+        self.picture = CAMERA.getPhoto()
+        if self.slitscanmode == SCAN_MODE_LIVE:
+            for mode in self.modes:
+                mode.setDefault()
+        self.slitscanobject = CAMERA.startSlitScan(self.slitscanmode)
+
+    def onPhoto(self):
+        log("Photo mode selected")
+        self.cancelTimer()
+        self.slitscan = False
+        self.imageReady.wait()
+        self.printPhoto(self.picture)
+        self.imageReady.clear()
+
+    def printPhoto(self, img):
+        log("Print photo")
+        for mode in self.modes:
+            img = mode.postProcess(img)
+        self.printID = PRINTER.printToPage(img)
+
+    def onSlitScan(self):
+        log('Slitscan mode selected')
+        self.slitscan = True
+        if self.slitscanmode == SCAN_MODE_LIVE:
+            self.printID = PRINTER.streamImages(self.slitscanobject)
+        BUZZ.buzz(TOUCHED)
+
+    def onStopSlitScan(self):
+        log('Shutter released')
+        BTNSHUTTER.disable()
+        CAMERA.stopSlitScan()
+        if self.slitscanmode == SCAN_MODE_LIVE:
+            for mode in self.modes:
+                mode.setMode(self.mode)
+
+        if self.slitscan and self.slitscanmode in (SCAN_MODE, SCAN_MODE_FIX):
+            img = self.slitscanobject.getImage()
+            self.printPhoto(img)
+        del(self.slitscanobject)
+        self.slitscanobject = None
+
+    def onCameraEvent(self, event, arg):
+        if event == CAMERA.RETURN and arg[0] == self.picture:
+            self.picture = arg[1]
+            self.imageReady.set()
+
+    def onPrinterEvent(self, event, arg):
+        if event == PRINTER.RETURN and arg[0] == self.printID:
+            log("Print finished")
+            BTNSHUTTER.enable()
+
+    def onAuto(self):
+        if not self.lock:
+            self.cancelTimer()
+            self.mode = -1
+            for mode in self.modes:
+                mode.setMode(self.mode)
+            BUZZ.buzz(OK)
+            for button in self.buttons:
+                button.disable()
+
+    def ontouched(self):
+        BUZZ.buzz(TOUCHED)
+
+    def onlock(self):
+        self.cancelTimer()
+        if self.lock:
+            log("Unlock buttons")
+            BTNLUM.enable()
+            BTNSIZE.enable()
+            BTNSLITSCANMODE.enable()
+        else:
+            log("lock buttons")
+            BTNLUM.disable()
+            BTNSIZE.disable()
+            BTNSLITSCANMODE.disable()
+            for button in self.buttons:
+                button.disable()
+        self.lock = not self.lock
+        BUZZ.buzz(OK)
+
+    def onModeSelect(self, mode):
+        log("Enter in select mode")
+        self.cancelTimer()
+        self.setTimer()
+        if mode == self.mode:
+            return
+        self.lastmode = self.mode
+        self.mode = mode
+        for button in self.buttons:
+            button.enable()
+
+    def cancelTimer(self):
+        if self.timer.is_set():
+            self.timeoutset.set()
+
+    def setTimer(self):
+        self.timer.set()
+
+    def timeout(self, timeout=3):
+        while not self.stopped:
+            self.timer.wait()
+            if not self.timeoutset.wait(timeout):
+                log("Select mode timeout")
+                self.mode = self.lastMode
+                BUZZ.buzz(CANCEL)
+                for button in self.buttons:
+                    button.disable()
+                self.mode = self.lastMode
+            self.timer.clear()
+            self.timeoutset.clear()
+
+    def onValue(self, val):
+        log("Select choice done")
+        self.cancelTimer()
+        self.modes[self.mode].setMode(val)
+        BUZZ.buzz(OK)
+        for button in self.buttons:
+            button.disable()
+
+
+def signal_handler(signal, frame):
+    print('You pressed Ctrl+C!')
+
+
+try:
+    CAM = polapi()
+    signal.signal(signal.SIGINT, signal_handler)
+    print('Press Ctrl+C to quit')
+    signal.pause()
+finally:
+    CAMERA.stop()
+    BUTTONS.stop()
+    PRINTER.stop()
+    BUZZ.stop()
+    log('Main exit')
+    sys.exit(0)

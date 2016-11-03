@@ -1,72 +1,63 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-#
-#  printer.py
-#  
-#  Copyright 2017 belese <belese@belese>
-#  
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation; either version 2 of the License, or
-#  (at your option) any later version.
-#  
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#  
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA 02110-1301, USA.
-#  
-# 
-import cups
-from serial import Serial
+from threading import Thread, Lock
+from thermal import ThermalPrinter
+from PIL import Image
+from resources.resource import Resource, queue_call
 
-PRT = "zj58"
+PRINTER_HEIGHT = 384
 
-class Printer :
+
+class Printer(Resource):
     def __init__(self):
-        printer = Serial("/dev/serial0", 9600)
+        Resource.__init__(self)
+        self.printer = ThermalPrinter("/dev/serial0", 9600)
+        self.printer.wake()
+        self.lock = Lock()
 
-        ESC = chr(27)
-        heatTime=185
-        heatInterval=160
-        heatingDots=6
-        printDensity = 00
-        printBreakTime = 00
+    @queue_call
+    def streamImages(self, streamer):
+        with self.lock:
+            # self.printer.wake()
+            self.printer.streamImage(streamer)
+            self.printer.feed(3)
+            # self.printer.sleep()
 
-        printer.write(ESC) # ESC - command
-        printer.write(chr(64)) # @   - initialize
-        printer.write(ESC) # ESC - command
-        printer.write(chr(55)) # 7   - print settings
-        printer.write(chr(heatingDots))  # Heating dots (20=balance of darkness vs no jams) default = 20
-        printer.write(chr(heatTime)) # heatTime Library default = 255 (max)
-        printer.write(chr(heatInterval)) # Heat interval (500 uS = slower, but darker) default = 250
-        printer.write(chr(18))
-        printer.write(chr(35))
-        printer.write(chr((printDensity << 4) | printBreakTime))
-        #printer.write(chr(255))
-        self.cupconn = cups.Connection()
-        self.printer = PRT
-    
-    def print_img(self,photo_file,size) :
-        option = {"media" : size,"orientation-requested":"4"}
-        print ("Print to size = %s"%size)
-        #option = {"media" : size}
-        self.cupconn.printFile(self.printer,photo_file,"None",option)
-    
-    def print_txt(self,txt) :
-        pass
+    @queue_call
+    def printToPage(self, image, Laat=False):
+        with self.lock:
+            print ('Printing...')
+            # self.printer.wake()
+            im_width, im_height = image.size
+            ratio = (PRINTER_HEIGHT / float(im_width))
+            height = int((float(im_height) * float(ratio)))
+            image = image.resize((PRINTER_HEIGHT, height), Image.ANTIALIAS)
+            self.printer.printImage(image, Laat)
+            self.printer.feed(3)
+            # self.printer.sleep()
+
+    @queue_call
+    def print_txt(self, text):
+        with self.lock:
+            # self.printer.wake()
+            self.printer.println(text)
+            # self.printer.sleep()
+
 
 PRINTER = Printer()
 
 
 def main(args):
-    PRINTER.print_img("/tmp/photo.png","X48MMY64MM")
-    
+    a = Image.open('../test2.jpg')
+    # PRINTER.printer.offline()
+    PRINTER.printer.sleep()
+    import time
+    time.sleep(2)
+    PRINTER.printer.println('test')
+    # PRINTER.printer.online()
+    PRINTER.printer.println('test')
+
+    # PRINTER.printImage(a,False)
     return 0
+
 
 if __name__ == '__main__':
     import sys
