@@ -55,8 +55,11 @@ ONPRESSED = 2
 ONRELEASED = 3
 
 
-def register_gpio(gpio, fn,mode = Gpio.BOTH ):
-    Gpio.setup(gpio, Gpio.IN, pull_up_down=Gpio.PUD_UP)
+MPR121IRQPIN = 4
+
+
+def register_gpio(gpio, fn,mode = Gpio.BOTH,pull_up_down = Gpio.PUD_UP ):
+    Gpio.setup(gpio, Gpio.IN, pull_up_down=pull_up_down)
     #Gpio.setup(gpio, Gpio.IN)
     Gpio.add_event_detect(gpio, mode, callback=fn)
 
@@ -119,10 +122,9 @@ class Mpr121:
         self.cap = mpr121.MPR121()
         if not self.cap.begin():
             log('Failed to initialize MPR121')
-        self.registerPinId = []
-        #Thread(None, self.mpr121, None).start()
+        self.registerPinId = []      
         self.last_touched = self.cap.touched()
-        register_gpio(4, self._onIrq,Gpio.FALLING)
+        register_gpio(MPR121IRQPIN, self._onIrq,Gpio.FALLING,pull_up_down=Gpio.PUD_OFF)
                 
     def register(self, pinid):
         self.registerPinId.append(pinid)
