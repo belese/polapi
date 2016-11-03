@@ -62,7 +62,8 @@ class Attiny85 :
 	def stop(self) :
 		self.getCommand(0x05)
 		
-		
+
+ATTINY85 = Attiny85()		
 		
 		
 

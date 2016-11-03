@@ -28,6 +28,7 @@ import time
 
 import RPi.GPIO as Gpio
 import Adafruit_MPR121.MPR121 as mpr121
+from attiny import ATTINY85
 
 try:
     from resources.utils import log
@@ -44,6 +45,7 @@ Gpio.setmode(Gpio.BCM)
 # BUTTON TYPE
 MPR121 = 0
 GPIO = 1
+ATTINY = 2
 
 # EVENTS
 ONTOUCHED = 1
@@ -54,6 +56,37 @@ ONRELEASED = 3
 def register_gpio(gpio, fn):
     Gpio.setup(gpio, Gpio.IN, pull_up_down=Gpio.PUD_UP)
     Gpio.add_event_detect(gpio, Gpio.BOTH, callback=fn, bouncetime=10)
+
+
+class attiny85btn :
+    def __init__(self, ONPRESSED, ONRELEASED):
+        self.ONPRESSED = ONPRESSED
+        self.ONRELEASED = ONRELEASED
+        self.stopped = False
+        Thread(None, self._attiny85, None).start()
+    
+    def register(self, data):
+        pass
+    
+    def _attiny85(self):
+        last_touched = ATTINY85.isPressed()
+        time.sleep(0.1)      
+        while not self.stopped:
+            current_touched = ATTINY85.isPressed()
+            if current_touched != last_touched:                
+                if current_touched :
+                   if self.ONPRESSED:
+                      self.ONPRESSED(ATTINY, 0)
+                else :
+                   if self.ONRELEASED:
+                      self.ONRELEASED(ATTINY, 0)
+                last_touched = current_touched
+            time.sleep(0.1)
+        print ('_attiny85 Stopped')
+
+    def stop(self):
+        self.stopped = True
+
 
 
 class GpioPi:
@@ -194,10 +227,12 @@ class Buttons:
 
     def __init__(self):
         self.gpio = GpioPi(self.ONPRESSED, self.ONRELEASED)
-        self.mpr = Mpr121(self.ONPRESSED, self.ONRELEASED)
-        self.buttons = {MPR121: {}, GPIO: {}}
+        #self.mpr = Mpr121(self.ONPRESSED, self.ONRELEASED)
+        self.att = attiny85btn(self.ONPRESSED, self.ONRELEASED)
+        #self.buttons = {MPR121: {}, GPIO: {},ATTINY : {}}
+        self.buttons = {GPIO: {},ATTINY : {}}
 
-    def register(self, type, btn):
+    def register(self, type, btn=0):
         if btn not in self.buttons[type]:
             self.buttons[type][btn] = []
             if type == GPIO:
@@ -245,10 +280,10 @@ def main(args):
     def release():
         print "release"
 
-    AUTO = BUTTONS.register(MPR121, 0)
+    AUTO = BUTTONS.register(ATTINY)
     AUTO.registerEvent(press, ONPRESSED, 0, 2)
     AUTO.registerEvent(longpress, ONPRESSED, 2)
-    AUTO.registerEvent(verylongpress, ONPRESSED, 4)
+    #AUTO.registerEvent(verylongpress, ONPRESSED, 4)
     AUTO.registerEvent(touch, ONTOUCHED)
     AUTO.registerEvent(release, ONRELEASED)
 
