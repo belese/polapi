@@ -63,8 +63,7 @@ class ThermalPrinter(Serial):
         Serial.__init__(self, port, baudrate,*args,**kwargs)
         #self.wake()
         self.reset()
-        self.setPrintSettings()
-        self.setPrintDensity()
+        
 
     def setPrintSettings(self, heatdot=5, heattime=180, heatinterval=200): #heatime=120
         self.writeBytes(
@@ -114,6 +113,8 @@ class ThermalPrinter(Serial):
             self.writeBytes(27, 68)         # Set tab stops
             self.writeBytes(4, 8, 12, 16)  # every 4 columns,
             self.writeBytes(20, 24, 28, 0)  # 0 is end-of-list.
+        self.setPrintSettings()
+        self.setPrintDensity()
 
     # Reset text formatting parameters.
     def setDefault(self):
@@ -286,6 +287,7 @@ class ThermalPrinter(Serial):
         return bitmap
 
     def printImage(self, image, LaaT=False):
+        self.reset()
         self.printBitmap(
             image.size[0],
             image.size[1],
@@ -293,6 +295,7 @@ class ThermalPrinter(Serial):
             LaaT)
 
     def streamImage(self, streamer):
+        self.reset()
         data = streamer.get()
         total_raw = 0
         while data:

@@ -204,6 +204,7 @@ class polapi:
         while not self.stopped:                                                          
             img = self.enhancer.postProcess(self.picture)        
             if img is not None:            
+                img.save('roman','JPEG')
                 self.enhancer.disable()
                 self.stopchineseprint.enable()            
                 PRINTER.printToPage(img,self.onprintfinished)
@@ -226,6 +227,7 @@ class polapi:
         self.btnshutter.disable() 
         
     def onRomanPhoto(self,data) :
+        print ('on Roman photo selected')
         self.enhancer.modes['Slitscan'].disable()
         self.enhancer.modes['Romanphoto'].enable()
         self.enhancer.modes['Romanphoto'].setMode(data)

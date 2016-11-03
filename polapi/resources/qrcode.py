@@ -31,7 +31,7 @@ class QRCode(Resource) :
                 #data = json.loads(data.data.decode("utf-8"))
                 dat={}
                 dat['event'] = 'r'
-                dat['data'] = data.data.decode("utf-8")
+                dat['data'] = data.data #.decode("utf-8")
                 print ('****************',self.events,dat)
                 if  dat['event'] in self.events :
                     for event in self.events[dat['event']] :                        

@@ -28,11 +28,13 @@ class Romanphoto(mode):
 
     def setMode(self, value=-1):
         print ('Set roman phot mode')
-        try :
-            self.dialogue = Dialogues(value)
-            self.value = 1
-        except :
-            self.value = -1
+        if not isinstance(value,int) :
+            try :
+                self.dialogue = Dialogues(value)
+                self.value = 1
+            except :
+                self.value = -1
+                raise
 
     def postProcess(self, img,level=0) :                
         if self.value == 1 :
@@ -55,7 +57,7 @@ class Romanphoto(mode):
             elif level == 1 :
                 romanphoto = RomanPhoto(img,img.size,self.faces,self.dialogue)
                 img = romanphoto.getBubbles()
-                img = img.rotate(180, expand=1)                                
+                img = img.rotate(180, expand=1)
                 self.value = -1
                 self.disable()
         return img

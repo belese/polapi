@@ -24,10 +24,13 @@
 import math
 from PIL import Image, ImageDraw,ImageFont
 import textwrap
+from urllib import unquote
+
 
 STEP = 10
 WIDTHMIN = 40
 HEIGHTMIN = 30
+
 
 class Dialogues :
 
@@ -45,18 +48,21 @@ class Dialogues :
 
         for line in data.split("|") :
             if not line[1:] :
+                if line[0].isdigit() :
+                   self.nbpersons = max(int(line[0])+1,self.nbpersons)    
                 continue
             if line[0] in self.TITLE :
                 self.title = line[1:]
             elif line[0] in self.NARRATOR :
-                self.narrator = line[1:]
+                self.narrator = unquote(line[1:]).decode('utf8')
+                print (self.narrator)
             elif line[0] in self.STARING :
-                self.starring.append(line[1:])
+                self.starring.append(unquote(line[1:])).decode('utf8')
             elif line[0].isdigit()  :
-                self.dialogues.append((int(line[0]),line[1:]))
+                text = unquote(line[1:]).decode('utf8')                
+                self.dialogues.append((int(line[0]),text))
                 self.nbpersons = max(int(line[0])+1,self.nbpersons)
-
-
+        print self.dialogues
 
 class RomanPhoto :
     def __init__(self,img,resolution,faces,dialogues) :
@@ -87,6 +93,8 @@ class RomanPhoto :
         rects = self.findRectangle(squ[:])
 
         for faceid,text in self.dialogues.dialogues :
+            if not text :
+                continue
             print ('do dialogue',faceid,text)
             square,bull = self.getSquareBubble(text,rects,self.faces[faceid],font)
             if square :
@@ -194,16 +202,47 @@ class RomanPhoto :
         larger = larger if larger < wb else wb
         border = border if larger + 2* border < wb else (wb - larger) / 2
 
-        print ('find arrow position',yb,hb,yf)
+        print ('find arrow position',xb,wb,yb,hb,xf,wf,yf,hf)
 
         #todo check with x instead
-        if yb + hb < yf + 20 or yb > yf + hf - 20 :
+        #if yb + hb < yf + 20 or yb > yf + hf - 20 :
+        if (xf > xb and xf < xb + wb) or (xf + wf > xb and xf +wf < xb + wb)  or (yb + hb < yf) or (yb > yf + hf) :
             print ('arrow top or bottom')
             
             larger = larger if larger < wb else wb
             border = border if larger + 2* border < wb else (wb - larger) / 2
             
             #top or bottom
+            if (( yb + hb < yf - larger ) or (yb > yf + hf + larger)) : 
+                print('center max',wf,xf-xb,xb+wb-xf-wf)
+                if max(wf,xf-xb,xb+wb-xf-wf) == xf-xb :
+                    #left center arrox
+                    x1 = xf - border
+                    x0 = x1 - larger
+                elif max(wf,xb+wb-xf-wf) == wf  :
+                    #center arrow
+                    x0 = xc - larger/2
+                else :
+                    x0 = xf + wf + border
+
+                x0 = xb + border if x0 - border < xb else x0
+                x0 = xb + wb - border -larger if x0 + larger + border > xb + wb else x0
+                x1 = x0 + larger
+            elif (xf - xb > xb + wb - (xf + wf)) or (xb + wb < xf) :
+                print('left')
+                #right
+                x0 = xf - larger
+                x0 = x0 if x0 + larger < xb + wb - border else xb + wb - border - larger
+                x0 = x0 if x0 > xb + border else xb + border
+                x1 = x0 + larger                
+            else :                
+                print('right')
+                x1 = xf + wf + larger
+                x1 = x1 if x1  < xb + wb - border else xb + wb - border
+                x0 = x1 - larger
+
+
+            """
             if xb + wb < xf :
                 #left
                 print('left')
@@ -230,10 +269,11 @@ class RomanPhoto :
                 x0 = xb + border if x0 - border < xb else x0
                 x0 = xb + wb - border -larger if x0 + larger + border > xb + wb else x0
                 x1 = x0 + larger
+            """
 
             x = x0 + (x1 - x0)/2
 
-            if yb + hb < yf + 20:
+            if yb  < yf :
                 #top
                 print ('top')
                 y0 = yb + hb
@@ -393,6 +433,7 @@ class RomanPhoto :
                 size = font.getsize(line)
                 bull_width = max(bull_width,size[0])
                 line_height = max(line_height,size[1])
+            print ('line height =',line_height)
             bull_width+=20
             bull_height= (line_height*len(text)) + 20
             bull_img = Image.new('RGBA', (bull_width,bull_height), "white")
@@ -400,7 +441,7 @@ class RomanPhoto :
             y=10
             x=10
             for line in text  :
-                bull_draw.text((x, y), line, font=font,fill="black")
+                bull_draw.text((x, y), unicode(line), font=font,fill="black")
                 y+=line_height
             return bull_img
 

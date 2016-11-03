@@ -17,4 +17,4 @@ def face(img) :
     if len(faces) > 0 :
         face = map(lambda x : [(int(x[0]/FACTOR) + 9)/ 10 * 10,(int(x[1]/FACTOR)+9) / 10 *10,(int(x[2]/FACTOR) +9 )/10 *10,(int(x[3]/FACTOR)+9)/10*10],faces)
     print ('Faces detected : ',face)
-    return face
+    return sorted(face,key = lambda x : x[0])
