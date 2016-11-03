@@ -28,14 +28,16 @@ import time
 
 import RPi.GPIO as Gpio
 import Adafruit_MPR121.MPR121 as mpr121
-from attiny import ATTINY85
+
 
 try:
     from resources.utils import log
     from resources.resource import Resource, queue_call
+    from resources.attiny import ATTINY85
+    
 except BaseException:
     from resource import Resource, queue_call
-
+	from attiny import ATTINY85
     def log(value):
         print value
 
@@ -259,6 +261,7 @@ class Buttons:
                     btn.stop()
         self.gpio.stop()
         self.mpr.stop()
+        self.att.stop()
 
 
 BUTTONS = Buttons()

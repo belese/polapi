@@ -31,6 +31,7 @@ from resources.printer import PRINTER
 from resources.buttons import GPIO, MPR121, BUTTONS, ONTOUCHED, ONPRESSED, ONRELEASED
 from resources.camera import CAMERA, SCAN_MODE, SCAN_MODE_FIX, SCAN_MODE_LIVE
 from resources.vibrator import BUZZ
+from resources.power import POWER,LOWER,HIGHER
 
 from resources.log import LOG
 
@@ -49,6 +50,12 @@ VALUE0 = 3
 VALUE1 = 4
 VALUE2 = 5
 VALUE3 = 6
+
+#BATTERY OPTION
+BATLOW = 4000
+BATVERYLOW = 3900
+BATCHARGE = 5300
+
 
 # default mode timeout
 TIMEOUT = 3
@@ -284,7 +291,19 @@ class polapi:
 
         CAMERA.register(self.onCameraEvent)
         PRINTER.register(self.onPrinterEvent)
+        POWER.registerEvent(onLowBattery,LOWER,BATLOW)
+		POWER.registerEvent(onVeryLowBattey,LOWER,BATVERYLOW)
+		POWER.registerEvent(onCharge,HIGHER,BATCHARGE)
 
+    def onLowBattery(self) :
+		pass
+	
+	def onVeryLowBattey(self) :
+		pass
+	
+	def onCharge(self) :
+		pass
+    
     def onSlitScanMode(self):
         if self.slitscanmode == SCAN_MODE:
             log("Select Scan mode fix")
@@ -436,5 +455,6 @@ finally:
     BUTTONS.stop()
     PRINTER.stop()
     BUZZ.stop()
+    POWER.stop()
     log('Main exit')
     sys.exit(0)
