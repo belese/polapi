@@ -29,24 +29,26 @@ from resources.utils import log
 
 class Camera :
     def __init__(self) :
-        pass
-        #self.camera = picamera.PiCamera()
-        #self.camera.start_preview()
+        #pass
+        self.camera = picamera.PiCamera()
+        self.camera.vflip = True
                                                 
     def setLuminosity(self,luminosity) :        
         for param in luminosity.keys() :
-            pass
-            #setattr(self.camera,param,luminosity[param])
+            #pass
+            setattr(self.camera,param,luminosity[param])
     
     def setFormat(self,size) :      
-        pass
-        #self.camera.resolution = size
+        #pass
+        self.camera.resolution = size
         
     def takePicture(self) :
-		pass
-        #rawCapture = PiRGBArray(self.camera)          
-        #self.camera.capture(rawCapture,format="bgr")
-        #return rawCapture.array     
+        #pass
+        self.camera.start_preview()
+        rawCapture = PiRGBArray(self.camera)          
+        self.camera.capture(rawCapture,format="bgr")
+        self.camera.stop_preview()
+        return rawCapture.array     
 
 CAMERA = Camera()
 

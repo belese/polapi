@@ -21,29 +21,37 @@
 #  MA 02110-1301, USA.
 #  
 # 
+import os.path
+
 import cups
+import PyPDF2
 #from serial import Serial
 from printer import Printer
 
-HEADER = '/home/pi/polapi/polapi/media/header.png'
-MIDDLE = '/home/pi/polapi/polapi/media/middle.png'
-FOOTER = '/home/pi/polapi/polapi/media/footer.png'
-TICKET = '/home/pi/polapi/polapi/media/ticket.pdf'
+HEADER = '/home/pi/polapi/polapi/media/header.pdf'
+MIDDLE = '/home/pi/polapi/polapi/media/avecjoie.pdf'
+FOOTER = '/home/pi/polapi/polapi/media/footer.pdf'
+TICKETBIG = '/var/spool/cups-pdf/ANONYMOUS/MSxpsPS.pdf'
+TICKETOK = '/tmp/ticket.pdf'
 
 class Caisse(Printer) :
     def print_img(self,photo_file,size) :
+        if not os.path.isfile(TICKETBIG) :
+            print "No ticket in printer, return"
+            return
         self.print_header()
-        option = {"media" : size,"orientation-requested":"3","FeedDist":"0feed3mm"}
+        option = {"media" : size,"orientation-requested":"3","FeedDist":"1feed6mm"}
         print ("Print to size = %s"%size)
         #option = {"media" : size}
         self.cupconn.printFile(self.printer,photo_file,"None",option)
         self.print_middle()
         self.print_ticket()
-        self.print_footer()
+        print ("End printing")
+        #self.print_footer()
     
     def print_header(self) :
         print 'header'
-        option = {"orientation-requested":"3","FeedDist":"0feed3mm"}
+        option = {"orientation-requested":"3","FeedDist":"1feed6mm"}
         self.cupconn.printFile(self.printer,HEADER,"None",option)
     
     def print_middle(self) :
@@ -52,9 +60,24 @@ class Caisse(Printer) :
     
     def print_ticket(self) :
         print 'ticket'
-        option = {"orientation-requested":"3","FeedDist":"0feed3mm"}
-        self.cupconn.printFile(self.printer,TICKET,"None",option)
+        self.scaleTicket()
+        option = {"orientation-requested":"3","FeedDist":"4feed15mm","media":"X48MMY128MM","fit-to-page":"true"}
+        self.cupconn.printFile(self.printer,TICKETOK,"None",option)
     
+    def scaleTicket(self) :
+        pdfFileObj = open(TICKETBIG, 'rb')
+        a = open(TICKETOK,'wb')
+        pdfReader = PyPDF2.PdfFileReader(pdfFileObj)
+        pdfWriter = PyPDF2.PdfFileWriter()
+        pageObj = pdfReader.getPage(0)
+        pageObj.trimBox.lowerLeft = (12,12 )
+        pageObj.trimBox.upperRight = (192+12, 512+12)
+        pageObj.cropBox.lowerLeft = (12, 12)
+        pageObj.cropBox.upperRight = (192+12, 512+12)       
+        pdfWriter.addPage(pageObj)
+        pdfWriter.write(a)
+        a.close()
+        
     def print_footer(self) :
         option = {"orientation-requested":"3"}
         self.cupconn.printFile(self.printer,FOOTER,"None",option)
@@ -64,7 +87,11 @@ CAISSE = Caisse()
 
 def main(args):
     #CAISSE.print_img("/tmp/photo.png","X48MMY48MM")
-    CAISSE.print_header()
+    CAISSE.print_ticket()
+    #CAISSE.print_middle()
+    #print 'start scaling'
+    #CAISSE.scaleTicket()
+    #print 'stop scaling'
     
     return 0
 

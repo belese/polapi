@@ -37,6 +37,7 @@ class caisse (polapi) :
 
 def main(args):
     a = caisse()
+    a.prt = CAISSE
     
 
 if __name__ == '__main__':

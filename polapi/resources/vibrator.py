@@ -30,10 +30,10 @@ import RPi.GPIO as GPIO
 BUZZER = 26
 
 #schema (DutyCycle,time)
-OK =((100,0.2),(0,0.1),(100,0.2))
-READY = ((100,0.2),(0,0.3),(100,0.2),(0,0.3),(100,0.2))
-CANCEL =((100,1.5),)
-TOUCHED = ((100,0.1),)
+OK =((1,1),(0,0.1),(1,1))
+READY = ((1,1),(0,0.3),(1,1),(0,0.3),(1,1))
+CANCEL =((1,1.5),)
+TOUCHED = ((1,0.6),)
 
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(BUZZER, GPIO.OUT)
@@ -45,10 +45,10 @@ def worker():
     while True:
         schema = q.get()
         for action in schema :
-			p = GPIO.PWM(BUZZER, 50)
-			p.start(action[0])
-			time.sleep(action[1])
-			p.stop()
+            print ('BUZZ')
+            GPIO.output(BUZZER,action[0])
+            time.sleep(action[1])
+        GPIO.output(BUZZER,0)
         q.task_done()
 
 
@@ -56,14 +56,18 @@ def worker():
 t = Thread(target=worker)
 t.daemon = True
 t.start()
-	
+    
 
 def vibrator(schema) :
-	q.put(schema)
+    q.put(schema)
 
 
 def main(args):
-    vibrator(READY)
+    vibrator(OK)
+    #GPIO.output(BUZZER,1)
+    import time
+    time.sleep(10)
+    #GPIO.output(BUZZER,0)
 
 if __name__ == '__main__':
     import sys

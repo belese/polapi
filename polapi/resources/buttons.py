@@ -61,8 +61,9 @@ VALUE2 = 5
 VALUE3 = 6
 
 def register_gpio(gpio,fn) :
+    print 'register gpio ',gpio
     Gpio.setup(gpio, Gpio.IN, pull_up_down=Gpio.PUD_UP)
-    Gpio.add_event_detect(gpio, Gpio.BOTH, callback=fn,bouncetime=DELAY*1000)
+    Gpio.add_event_detect(gpio, Gpio.BOTH, callback=fn,bouncetime=10)
 
 class GpioPi :
     def __init__(self,onPress,onRelease) :
@@ -73,14 +74,10 @@ class GpioPi :
         register_gpio(gpioid,self._onPress)
 
     def _onPress(self,gpioid) :
-     if Gpio.input(gpioid):
-         self.onPress(GPIO,gpioid)
-     else:
-         self.onRelease(GPIO,gpioid)
-
-
-
-
+        if not Gpio.input(gpioid):            
+            self.onPress(GPIO,gpioid)
+        else:            
+            self.onRelease(GPIO,gpioid)
 
 class Mpr121 :
     def __init__(self,onPress,onRelease) :
@@ -114,7 +111,7 @@ class Mpr121 :
            time.sleep(0.1)
 
 class Button :
-    def __init__(self,onPress,onLongPress) :
+    def __init__(self,onPress,onLongPress=None) :
         self.state = True
         self.value = False
         self.onPress = onPress
@@ -175,6 +172,7 @@ class Buttons :
         return self.buttons[type][btn][-1]
 
     def onPress(self,type,btn) :
+        print "i'm here",type,btn,self.buttons[type]
         if self.buttons[type].has_key(btn) :
             for btn in self.buttons[type][btn] :
                 btn._onPress()
@@ -195,6 +193,7 @@ def main(args):
 
     for i in range(7) :
         BUTTONS.register(MPR121,i,touch,longpress)
+    BUTTONS.register(GPIO,DECLENCHEUR,touch,longpress)
 
 
 
