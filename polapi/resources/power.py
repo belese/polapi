@@ -37,7 +37,7 @@ class Power :
         self.thread = Thread(target=self._callEvent)
         self.thread.start()
             
-    def stop(self)
+    def stop(self) :
 		self.stop = True
 		
     def getVoltage(self) :

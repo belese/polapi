@@ -37,7 +37,7 @@ try:
     
 except BaseException:
     from resource import Resource, queue_call
-	from attiny import ATTINY85
+    from attiny import ATTINY85
     def log(value):
         print value
 
@@ -55,9 +55,11 @@ ONPRESSED = 2
 ONRELEASED = 3
 
 
-def register_gpio(gpio, fn):
+def register_gpio(gpio, fn,mode = Gpio.BOTH ):
     Gpio.setup(gpio, Gpio.IN, pull_up_down=Gpio.PUD_UP)
-    Gpio.add_event_detect(gpio, Gpio.BOTH, callback=fn, bouncetime=10)
+    #Gpio.setup(gpio, Gpio.IN)
+    Gpio.add_event_detect(gpio, mode, callback=fn)
+
 
 
 class attiny85btn :
@@ -118,28 +120,26 @@ class Mpr121:
         if not self.cap.begin():
             log('Failed to initialize MPR121')
         self.registerPinId = []
-        Thread(None, self.mpr121, None).start()
-
+        #Thread(None, self.mpr121, None).start()
+        self.last_touched = self.cap.touched()
+        register_gpio(4, self._onIrq,Gpio.FALLING)
+                
     def register(self, pinid):
         self.registerPinId.append(pinid)
 
-    def mpr121(self):
-        last_touched = self.cap.touched()
-        while not self.stopped:
-            current_touched = self.cap.touched()
-            if current_touched != last_touched:
-                for i in self.registerPinId:
-                    pin_bit = 1 << i
-                    if current_touched & pin_bit and not last_touched & pin_bit:
-                        if self.ONPRESSED:
-                            self.ONPRESSED(MPR121, i)
-                    if not current_touched & pin_bit and last_touched & pin_bit:
-                        if self.ONRELEASED:
-                            self.ONRELEASED(MPR121, i)
-                last_touched = current_touched
-            time.sleep(0.1)
-        print ('Mpr121 Stopped')
-
+    def _onIrq(self,gpioid):                
+        current_touched = self.cap.touched()
+        if current_touched != self.last_touched:
+            for i in self.registerPinId:
+                pin_bit = 1 << i
+                if current_touched & pin_bit and not self.last_touched & pin_bit:
+                    if self.ONPRESSED:
+                        self.ONPRESSED(MPR121, i)
+                if not current_touched & pin_bit and self.last_touched & pin_bit:
+                    if self.ONRELEASED:
+                        self.ONRELEASED(MPR121, i)
+            self.last_touched = current_touched
+                    
     def stop(self):
         self.stopped = True
 
@@ -229,10 +229,10 @@ class Buttons:
 
     def __init__(self):
         self.gpio = GpioPi(self.ONPRESSED, self.ONRELEASED)
-        #self.mpr = Mpr121(self.ONPRESSED, self.ONRELEASED)
+        self.mpr = Mpr121(self.ONPRESSED, self.ONRELEASED)
         self.att = attiny85btn(self.ONPRESSED, self.ONRELEASED)
-        #self.buttons = {MPR121: {}, GPIO: {},ATTINY : {}}
-        self.buttons = {GPIO: {},ATTINY : {}}
+        self.buttons = {MPR121: {}, GPIO: {},ATTINY : {}}
+        #self.buttons = {GPIO: {},ATTINY : {}}
 
     def register(self, type, btn=0):
         if btn not in self.buttons[type]:
@@ -284,6 +284,12 @@ def main(args):
         print "release"
 
     AUTO = BUTTONS.register(ATTINY)
+    AUTO2 = BUTTONS.register(MPR121,1)
+    AUTO2.registerEvent(press, ONPRESSED, 0, 2)
+    AUTO2.registerEvent(release, ONRELEASED)
+    AUTO3 = BUTTONS.register(MPR121,0)
+    AUTO3.registerEvent(press, ONPRESSED, 0, 3)
+    AUTO3.registerEvent(release, ONRELEASED)
     AUTO.registerEvent(press, ONPRESSED, 0, 2)
     AUTO.registerEvent(longpress, ONPRESSED, 2)
     #AUTO.registerEvent(verylongpress, ONPRESSED, 4)
@@ -294,5 +300,5 @@ def main(args):
 
 
 if __name__ == '__main__':
-    import sys
+    import sys   
     sys.exit(main(sys.argv))
