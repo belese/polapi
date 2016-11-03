@@ -68,7 +68,7 @@ class Camera(Resource):
         self.camera = picamera.PiCamera()
         self.camera.framerate = self.framerate
         self.camera.resolution = self.resolution 
-            #self.camera.vflip = True
+        self.camera.vflip = False
 
     @queue_call
     def getPhoto(self,onPhoto):
@@ -83,27 +83,29 @@ class Camera(Resource):
         stream.seek(0)
         return Image.open(stream)
     
-    def startMode(self,iostream) :                                
-        self.startRecording(iostream)        
+    def startMode(self,iostream,format='rgb') :
+        self.camera.resolution = self.resolution                                 
+        self.startRecording(iostream,format)        
 
     def registerEvent(self,cb,event) :
         self.events[event].append(cb)
 
     
     @queue_call
-    def startRecording(self, iostream):
+    def startRecording(self, iostream,format='rgb'):
         print ('start recoreding, acquire lock')
         #self.camlock.acquire()        
         print ('start recoreding, lock acquire')
         self.camera.framerate = self.framerate
-        self.camera.start_recording(iostream, format='yuv', resize=self.resolution)
+        self.camera.start_recording(iostream, format=format, resize=self.resolution)
         print ('Leave startrecording')
 
     @queue_call
     def stopRecording(self):         
         print ('in stop recording')
         try :
-            self.camera.stop_recording()            
+            if self.camera.recording:
+                self.camera.stop_recording()            
         except :
             raise
         finally :
@@ -120,7 +122,7 @@ class Camera(Resource):
     def stop(self):
         self.stopped = True
         if self.camera.recording:
-            self.stopSlitScan()
+            self.stopMode()
         #with self.camlock:
         self.camera.close()
         Resource.stop(self)

@@ -2,7 +2,7 @@ import threading
 import Queue
 from PIL import Image
 
-from resources.modes import allframes
+from . import allframes
 
 SLITSCAN = 10
 
@@ -17,7 +17,7 @@ SCAN_MODE_LIVE = 4
 
 SLIT_SCAN_FIX_WIDTH = 1
 
-
+from picamera.array import bytes_to_rgb
 
 
 class _SlitScan(allframes):    
@@ -44,8 +44,9 @@ class _SlitScan(allframes):
                 if (i + 1) % k == 0:
                     frame += 1
             if frame != 0:
-                column = Image.frombuffer(
-                    'L', self.resolution, self.read(), "raw", 'L', 0, 1)
+                #column = Image.frombuffer('L', self.resolution, self.read(), "raw", 'L', 0, 1)
+                column = bytes_to_rgb(self.read(),self.resolution)               
+                column = Image.fromarray(frame)
                 column = self.cropMethod(column, x, frame)
                 img.paste(column, (x, 0))
                 del(column)
@@ -81,7 +82,8 @@ class ScanModeLive(ScanModeFix):
         frame = self.read()
         if not frame:
             return
-        frame = Image.frombuffer('L', self.resolution, frame, "raw", 'L', 0, 1)
+        frame = bytes_to_rgb(frame,self.resolution)               
+        frame = Image.fromarray(frame)
         return self.cropMethod(frame, 0, self.slitSize).rotate(90, expand=1)
 
 def SlitScan(resolution,mode=SCAN_MODE, slitscansize=1):

@@ -28,6 +28,16 @@ import RPi.GPIO as GPIO
 # GPIO PIN ID
 BUZZER = 18
 
+#Buzzer (DutyCycle,time)
+OK = ((1, 0.2), (0, 0.1), (1, 0.2),(0, 0.1))
+READY = ((1, 0.3), (0, 0.3), (1, 0.3), (0, 0.3), (1, 0.3))
+CANCEL = ((1, 0.1),)
+TOUCHED = ((1, 0.25),)
+ERROR =((1,0.5),(0,0.1),(1,0.5),(0,0.1),(1,0.5))
+def REPEAT(x): return ((1, 0.2), (0, 0.1)) * x
+
+
+
 
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(BUZZER, GPIO.OUT)

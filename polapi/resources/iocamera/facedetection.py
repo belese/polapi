@@ -2,18 +2,27 @@ from . import lastframe
 import cv2
 from picamera.array import bytes_to_rgb
 from PIL import Image
+import threading
+
+face_cascade = cv2.CascadeClassifier('resources/cascade/haarcascade_frontalface_alt2.xml')
+
 
 class face_detection(lastframe) :
     def __init__(self,resolution,onface):
         lastframe.__init__(self,resolution)
         self.onface = onface
-        threading.thread(target=self.run).start()
+        threading.Thread(target=self.run).start()
 
     def run(self) :
-        while not self.terminated.is_set() :   
+        i=0
+        while not self.finished.is_set() :   
             data= self.read()         
+            i+=1
             frame = bytes_to_rgb(data,self.resolution)               
             gray = cv2.cvtColor(frame,cv2.COLOR_RGB2GRAY)
+            cv2.imwrite("img%d.jpeg"%i, gray)
             faces = face_cascade.detectMultiScale(gray, 1.1, 20)            
+            print ('lookup for faces',faces)
             if len(faces) > 0 :
-                self.onface(Image.frombuffer('L', self.resolution, data, "raw", 'L', 0, 1),faces)
+                img = Image.fromarray(frame)
+                self.onface(img,faces)
