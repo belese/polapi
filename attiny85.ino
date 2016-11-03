@@ -1,3 +1,4 @@
+#include <avr/wdt.h>
 #include <avr/interrupt.h>
 #include <avr/sleep.h>
 #include <TinyWire.h>
@@ -13,8 +14,8 @@
 
 
 #define WAKE_UP_PRESS 2000 // 2 sec
-#define RESET_PRESS 10000 // 60 sec
-
+#define RESET_PRESS 10000 // 120 sec
+#define PISTARTTIME 8000
 byte own_address = 10;
 
 volatile uint8_t i2c_regs[] =
@@ -29,24 +30,30 @@ volatile byte cmd = 0x00;
 int cmd_len;
 
 byte data[2];
-volatile byte data_position=0;
+volatile byte data_position;
 
-byte state = 0x00;
-long start_press = millis();
+byte state;
+long start_press;
+long started;
 
+int i2c = 0;
 
 
 void setup() 
 {  
   // Read 1.1V reference against AVcc
   // set the reference to Vcc and the measurement to the internal 1.1V reference
+  MCUSR &= ~(1<<WDRF); // reset status flag
+  wdt_disable();
   ADMUX = _BV(MUX3) | _BV(MUX2);    
-  
+  state = 0x02;
+  start_press = 0;
+  started = millis();
+  data_position=0;
   pinMode(pwrPin, OUTPUT);
   digitalWrite(pwrPin, LOW);
   pinMode(btnPin, INPUT_PULLUP);
-  pinMode(killPin, INPUT);
-  
+  pinMode(killPin, INPUT);  
   TinyWire.begin( own_address );  
   TinyWire.onReceive( onI2CReceive );
   TinyWire.onRequest( onI2CRequest );
@@ -63,6 +70,7 @@ void loop()
         check_wake_up(); //check if there is a long press to wake up
         break;
       case 0x02 : //In function        
+        //check_initi2c();
         check_reset();
         readVcc();
         readBtnStat();
@@ -71,14 +79,21 @@ void loop()
   }
 }
 
+void reboot() 
+{
+ // wdt_reset();
+ wdt_enable(WDTO_15MS); 
+ while (true) {}  
+} //reboot
 
 void check_wake_up()
 {  
   if (millis() > start_press + WAKE_UP_PRESS)
   {
-      digitalWrite(pwrPin, HIGH);
-      state = 0x02; 
-      start_press = 0;
+      //digitalWrite(pwrPin, LOW);
+      //state = 0x02; 
+      //start_press = 0;
+      reboot();
        
   }
 
@@ -91,7 +106,7 @@ void check_wake_up()
 
 void stopPower()
 {
-    digitalWrite(pwrPin, LOW);
+    digitalWrite(pwrPin, HIGH);
     state = 0x00;    
 }
 
@@ -121,9 +136,12 @@ void check_reset()
 void readPiStat()
 {
     //check if pi is on otherwise shutdown
-    if (digitalRead(killPin))
+    if (millis() > started + PISTARTTIME)
     {
-      stopPower();
+      if (digitalRead(killPin))
+      {
+        stopPower();
+      }
     }
 }
 
@@ -141,7 +159,7 @@ void sleep()
     set_sleep_mode(SLEEP_MODE_PWR_DOWN);    // replaces above statement
 
     sleep_enable();                         // Sets the Sleep Enable bit in the MCUCR Register (SE BIT)
-    sei();                                  // Enable interrupts
+    //sei();                                  // Enable interrupts
     sleep_cpu();                            // sleep
 
     cli();                                  // Disable interrupts
