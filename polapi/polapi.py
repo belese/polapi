@@ -24,7 +24,7 @@
 from threading import Timer
 
 from resources.printer import PRINTER
-from resources.buttons import BUTTONS,DECLENCHEUR,AUTO,LUM,FORMAT,VALUE0,VALUE1,VALUE2,VALUE3
+from resources.buttons import GPIO,MPR121,BUTTONS,DECLENCHEUR,AUTO,LUM,FORMAT,VALUE0,VALUE1,VALUE2,VALUE3
 from resources.camera import CAMERA
 from resources.utils import log,blackandwhite,clahe,histogramme,toFile
 import resources.vibrator as BUZZ
@@ -115,7 +115,7 @@ class polapi :
 		
 		#register all buttons
 		self.declencheur = BUTTONS.register(GPIO,DECLENCHEUR,self.takePhoto)
-		self.auto = BUTTONS.register(MPR121,AUTO,None,self.onAuto)
+		self.auto = BUTTONS.register(MPR121,AUTO,self.onAuto,self.onChangeMode)
 		self.lum = BUTTONS.register(MPR121,LUM,self.onLuminosity)
 		self.bsize = BUTTONS.register(MPR121,FORMAT,self.onFormat)
 		self.value0 = BUTTONS.register(MPR121,VALUE0,self.onValue0)		
@@ -124,6 +124,7 @@ class polapi :
 		self.value3 = BUTTONS.register(MPR121,VALUE3,self.onValue3)				
 		self.mode = None
 		self.onValue(AUTO,STANDARD)
+		self.prt = PRINTER
 		BUZZ.vibrator(BUZZ.READY)
 	
 	
@@ -132,7 +133,7 @@ class polapi :
 		BUZZ.vibrator(BUZZ.TOUCHED)
 		img = CAMERA.takePicture()
 		img = self.postProcess(img)				
-		PRINTER.print_img(toFile(img,FILE),self.size[1])
+		self.prt.print_img(toFile(img,FILE),self.size[1])
 	
 	def postProcess(self,img) :
 		img = blackandwhite(img)		
@@ -141,11 +142,15 @@ class polapi :
 		else :
 			return histogramme(img)
 			
-	def onAuto(self,delay) :
+	def onAuto(self) :		
+		#short press, Return to AUTO MODE
 		log ("Reset settings to auto")
 		BUZZ.vibrator(BUZZ.TOUCHED)
 		self.mode = None
 		self.onValue(AUTO,STANDARD)
+		
+	def onChangeMode(self) :
+		print ("On Other mode")		
 		
 	def idle(self) :		
 		self.value0.disable()
@@ -210,7 +215,14 @@ class polapi :
 		BUZZ.vibrator(BUZZ.CANCEL)
 		self.idle()
 
-a = polapi()
 
-import time
-time.sleep(100)
+def main(args):
+    import time
+    a = polapi()
+    time.sleep(100)
+    return 0
+
+if __name__ == '__main__':
+    import sys
+    sys.exit(main(sys.argv))
+

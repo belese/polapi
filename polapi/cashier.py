@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-#  camera.py
+#  cashier.py
 #  
 #  Copyright 2017 belese <belese@belese>
 #  
@@ -22,31 +22,23 @@
 #  
 #  
 
-import picamera
-from picamera.array import PiRGBArray
-from resources.utils import log
+from polapi import polapi
+from resources.caisse import CAISSE
+from resources.printer import PRINTER
 
+class caisse (polapi) :
+	def onChangeMode(self) :
+		if self.prt == PRINTER :
+			print 'mode = caisse'
+			self.prt = CAISSE
+		else :
+			print 'mode = normal'
+			self.prt = PRINTER
 
-class Camera :
-    def __init__(self) :
-        pass
-        #self.camera = picamera.PiCamera()
-        #self.camera.start_preview()
-                                                
-    def setLuminosity(self,luminosity) :        
-        for param in luminosity.keys() :
-            pass
-            #setattr(self.camera,param,luminosity[param])
+def main(args):
+    a = caisse()
     
-    def setFormat(self,size) :      
-        pass
-        #self.camera.resolution = size
-        
-    def takePicture(self) :
-		pass
-        #rawCapture = PiRGBArray(self.camera)          
-        #self.camera.capture(rawCapture,format="bgr")
-        #return rawCapture.array     
 
-CAMERA = Camera()
-
+if __name__ == '__main__':
+    import sys
+    sys.exit(main(sys.argv))
