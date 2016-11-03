@@ -54,7 +54,7 @@ class Dialogues :
                 self.starring.append(line[1:])
             elif line[0].isdigit()  :
                 self.dialogues.append((int(line[0]),line[1:]))
-                self.nbpersons = max(int(line[0]),self.nbpersons)
+                self.nbpersons = max(int(line[0])+1,self.nbpersons)
 
 
 
@@ -69,7 +69,7 @@ class RomanPhoto :
         self.draw = ImageDraw.Draw(self.im)
 
 
-    def getBubbles(self,font="resources/fonts/traveling-_typewriter.ttf",size=30) :
+    def getBubbles(self,font="resources/fonts/traveling-_typewriter.ttf",size=28) :
         squ = self.faces[:]
         print ('init squ',squ)
         #for rectangle in self.faces :
@@ -103,8 +103,7 @@ class RomanPhoto :
                     yr = arrow[0][1] + border
                     xr2 = int(max(arrow[1][0],arrow[2][0]))
                     squ.append((xr,yr,xr2-xr,arrow[2][1]-yr))
-                    #self.draw.rectangle((xr,yr,xr2,arrow[2][1]))
-
+                    #self.draw.rectangle((xr,yr,xr2,arrow[2][1]))                
                 self.im.paste(bull, pos)
                 print ('*****************************Draw Bull',bull.size,pos)
                 rects = self.findRectangle(squ[:],pos[1]+20)
@@ -186,7 +185,7 @@ class RomanPhoto :
         lines.reverse()
         return  self.findDown(start,lenght,lines)
 
-    def findArrow(self,face,bull,border = 20,larger=20) :        
+    def findArrow(self,face,bull,border = 40,larger=40) :        
         xf,yf,wf,hf = face
         xb,yb,wb,hb = bull
         xc = xf + wf/2

@@ -40,22 +40,4 @@ class mode(object) :
     def stop(self) :
         self.stopped = True
         
-    def printPhoto(self, img):
-        log("Print photo")
-        try :
-            for mode in self.modes:        
-                img = mode.postProcess(img)
-        except Exception as e :
-            log('Exception',str(e),level=30)
-            BUZZ.buzz(ERROR)
-            raise
-        else :            
-            self.printID = PRINTER.printToPage(img,self.onprintfinished)
-
-    def reprint(self) :
-        if self.picture :
-            BUZZ.buzz(OK)
-            #self.printPhoto(self.picture) 
-    
-    def onprintfinished(self):                    
-        BUZZ.buzz(OK)                
+              

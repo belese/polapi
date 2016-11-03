@@ -1,7 +1,7 @@
 from PIL import Image, ImageEnhance
 from resources.camera import CAMERA
 from resources.log import LOG
-from . import mode
+from .imode import mode
 import operator
 log = LOG.log
 
@@ -70,7 +70,10 @@ LUMHIGH = {"sharpness": 0,
            "awb_mode": 'sunlight',
            }
 
-class luminosity(mode):
+class Luminosity(mode):
+
+    ORDER = 10
+
     def __init__(self):
         self.values = [LUMLOW, LUMMEDIUM, LUMMEDIUMHIGH, LUMHIGH, LUMDEFAULT]
         self.value = -1
@@ -83,22 +86,23 @@ class luminosity(mode):
         self.value = value
         CAMERA.setSettings(self.values[value])        
 
-    def postProcess(self, img):
-        log("Luminosity post process")
-        # img.save('original.jpg')
-        #img = Ying_2017_CAIP(img) 
-        try :
-            img = self.equalize(img)
-        except :
-            pass
-        img = ImageEnhance.Color(img)        
-        img = img.enhance(0)
-        # img.save('bw.jpg')
-        img = ImageEnhance.Brightness(img)
-        img = img.enhance(self.postvalue[self.value][0])
-        # img.save('brightness.jpg')
-        img = ImageEnhance.Contrast(img)
-        img = img.enhance(self.postvalue[self.value][1])
+    def postProcess(self, img,level=0):
+        if level == 0 :
+            log("Luminosity post process")
+            # img.save('original.jpg')
+            #img = Ying_2017_CAIP(img) 
+            try :
+                img = self.equalize(img)
+            except :
+                pass
+            img = ImageEnhance.Color(img)        
+            img = img.enhance(0)
+            # img.save('bw.jpg')
+            img = ImageEnhance.Brightness(img)
+            img = img.enhance(self.postvalue[self.value][0])
+            # img.save('brightness.jpg')
+            img = ImageEnhance.Contrast(img)
+            img = img.enhance(self.postvalue[self.value][1])
         return img
 
     def equalize(self,im):

@@ -46,7 +46,7 @@ class Resource():
         self.queue = Queue.Queue()
         self.count = 1
         self.terminated = False
-        self.registeredEvents = []
+        #self.registeredEvents = []
         for i in range(self.NB_WORKER):
             Thread(target=self.start).start()
 
@@ -62,7 +62,8 @@ class Resource():
                 print ('Unmanaged esxception',e)
                 raise
             finally :
-                self.onReturn(i, rc)
+                #self.onReturn(i, rc)
+                pass
         print ('ressources thread stopped')
 
     def stop(self):
@@ -71,6 +72,8 @@ class Resource():
 
     def _stopped(self, arg):
         print ('ressources stopped')
+
+    """
 
     def register(self, cb):
         self.registeredEvents.append(cb)
@@ -81,7 +84,8 @@ class Resource():
 
     def onReturn(self, id, rc):
         self.onREvent(self.RETURN, (id, rc))
-
+    """
+    
     def sleep(self):
         pass
 

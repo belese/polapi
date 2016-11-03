@@ -13,7 +13,6 @@ from . import mode
 
 log = LOG.log
 
-BTNSHUTTER = BUTTONS.register(ATTINY)
 BTNFORCESTOP = BUTTONS.register(ATTINY)
 
 class Photo(mode) :
@@ -61,65 +60,7 @@ class Photo(mode) :
             CAMERA.sleep()
             self.sleeping = True
         
-    def onShutterTouched(self):
-        log("Shutter touched")
-        self.ontouch()
-        self.imageReady.clear()
-        CAMERA.getPhoto(self.onImageReady)        
-        self.slitscanobject = SlitScan(CAMERA.resolution,self.slitscanmode)
-        CAMERA.startMode(self.slitscanobject,format='yuv')
-    
-    def onPhoto(self):
-        log("Photo mode selected")             
-        self.slitscan = False
-        self.imageReady.wait()    
-        self.onimage(self.picture)
-    
-        self.printPhoto(self.picture)
-    
-    def onStopSlitScan(self):
-        log('Shutter released')
-        CAMERA.stopMode()                
-        self.sleep()
-        if self.slitscan and self.slitscanmode in (SCAN_MODE, SCAN_MODE_FIX):   
-            print ('before self.slitscan get image')         
-            img = self.slitscanobject.getImage()
-            print ('after self.slitscan get image')         
-            self.onimage(img)
-            self.picture = img
-            print ('we ve got an image',img)            
-            self.printPhoto(img)
-        elif self.slitscan :
-            for mode in self.modes:
-                mode.setMode(self.mode)
-                
-        del(self.slitscanobject)
-        self.slitscan = False
-        self.slitscanobject = None
-
-    def onSlitScan(self):
-        log('Slitscan mode selected')
-        self.slitscan = True
-        if self.slitscanmode == SCAN_MODE_LIVE:
-            PRINTER.streamImages(self.slitscanobject,self.onprintfinished)
-        BUZZ.buzz(TOUCHED)
-    
-    def onImageReady(self, picture):  
-        print ('Image ready')
-        self.imageReady.set()                
-        self.picture = picture
-    
-    def onprintfinished(self):                    
-        BUZZ.buzz(OK)        
-        self.wakeup()            
-    
-    def enable(self) :
-        mode.enable(self)
-        BTNSHUTTER.enable()        
-
-    def disable(self) :
-        mode.disable(self)
-        BTNSHUTTER.disable()        
+      
     
     def stop(self) :
         mode.stop(self)

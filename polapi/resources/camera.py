@@ -43,7 +43,8 @@ class Camera(Resource):
     def __init__(self,resolution=(640,384)):
         Resource.__init__(self)
         self.camera = None
-        self.camlock = threading.Lock()
+        self.recordlock = threading.Lock()
+        self.frameready = threading.Event()
         self.initCamera()
         self.img = None
         self.keepres = None
@@ -53,12 +54,16 @@ class Camera(Resource):
         self._mode = self.mode
         self._args = []
         self._kwargs = {}
-        self.framerate = 90
-
+        self.framerate = 15
+        
     @queue_call
-    def setSettings(self, settings):
-        for param in settings.keys():            
-            setattr(self.camera, param, settings[param])
+    def setSettings(self, settings):        
+        for param in settings.keys(): 
+            try :          
+                setattr(self.camera, param, settings[param])
+            except Exception as e:
+                print ('Cannot set attr ',param,settings[param],str(e))
+                pass
         self.resolution = self.camera.resolution 
 
     @queue_call
@@ -71,35 +76,36 @@ class Camera(Resource):
         self.camera.vflip = False
 
     @queue_call
-    def getPhoto(self,onPhoto):
+    def getPhoto(self,onPhoto,*args,**kwargs):
         print ('getPhoto')
-        photo = self._getPhoto()
+        photo = self._getPhoto(*args,**kwargs)
         onPhoto(photo)
         return photo
     
-    def _getPhoto(self) :        
+    def _getPhoto(self,format='jpeg',*args,**kwargs) :   
+        print ('_getPhoto')     
         stream = io.BytesIO()        
-        self.camera.capture(stream, format='jpeg')
+        self.camera.capture(stream, format=format)
         stream.seek(0)
+        print ('_getPhoto return')     
         return Image.open(stream)
     
     def startMode(self,iostream,format='rgb') :
         print ('startmode self.resolution',self.resolution)
-        #self.camera.resolution = self.resolution                                 
+        #self.camera.resolution = self.resolution 
         self.startRecording(iostream,format)        
 
-    def registerEvent(self,cb,event) :
-        self.events[event].append(cb)
+
+    def stopMode(self):
+        print ('STOP MODE')
+        #if self.mode :
+        self.stopRecording()            
 
     
     @queue_call
-    def startRecording(self, iostream,format='rgb'):
-        print ('start recoreding, acquire lock')
-        #self.camlock.acquire()        
-        print ('start recoreding, lock acquire')
-        self.camera.framerate = self.framerate
-        self.camera.start_recording(iostream, format=format, resize=self.resolution)
-        print ('Leave startrecording')
+    def startRecording(self, iostream,format='rgb'):        
+        self.recordlock.acquire()        
+        self.camera.start_recording(iostream, format=format, resize=self.resolution)        
 
     @queue_call
     def stopRecording(self):         
@@ -110,15 +116,25 @@ class Camera(Resource):
         except :
             raise
         finally :
-            print ('stop recording, release lock')            
-            #self.camlock.release()
+            self.recordlock.release()
+            print ('stop recording, release lock')                        
+                    
+    @property
+    def sequence(self) :        
+       # with self.recordlock :
+        print ('yield photo')
+        while not self.stopped :
+            self.frameready.clear()
+            self.getPhoto(self.onFrame)
+            print ('wait photo ready')
+            self.frameready.wait()
+            print ('yield frame')
+            yield self.frame        
+        
+    def onFrame(self,img) :
+        self.frame = img
+        self.frameready.set()
             
-
-    def stopMode(self):
-        print ('STOP MODE')
-        #if self.mode :
-        self.stopRecording()            
-
     @queue_call
     def stop(self):
         self.stopped = True

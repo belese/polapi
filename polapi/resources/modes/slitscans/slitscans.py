@@ -1,10 +1,19 @@
+import threading
+import Queue
 from PIL import Image
 
 from . import allframes
 
+SLITSCAN = 10
+
 SLITSCAN_WIDTH = 640
 SLITSCAN_HEIGHT = 384
 SLITSCAN_SIZE = (SLITSCAN_WIDTH, SLITSCAN_HEIGHT)
+
+NO_SCAN = 1
+SCAN_MODE = 2
+SCAN_MODE_FIX = 3
+SCAN_MODE_LIVE = 4
 
 SLIT_SCAN_FIX_WIDTH = 1
 

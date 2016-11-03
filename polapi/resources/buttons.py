@@ -170,10 +170,12 @@ class Button(Resource):
         if event == ONPRESSED:
             self.events[ONPRESSED].sort(key=lambda colonnes: colonnes[1])
 
+    #@queue_call
     def enable(self):
         with self.lockStatus:
             self.state = True
 
+    #@queue_call
     def disable(self):
         with self.lockStatus:
             self.state = False

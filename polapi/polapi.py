@@ -30,33 +30,23 @@ from PIL import Image, ImageEnhance
 
 from resources.printer import PRINTER
 from resources.buttons import GPIO, MPR121, ATTINY, BUTTONS, ONTOUCHED, ONPRESSED, ONRELEASED
-from resources.camera import CAMERA
 from resources.vibrator import BUZZ,OK,READY,CANCEL,TOUCHED,ERROR,REPEAT
 from resources.power import POWER,LOWER,HIGHER
-#from resources.modes.slitscan import SlitScan, SCAN_MODE, SCAN_MODE_FIX, SCAN_MODE_LIVE
 from resources.cammode.qrcode import QrCode
 from resources.wiring import DECLENCHEUR,AUTO,LUM,VALUE0,VALUE1,VALUE2,VALUE3,FORMAT
-from resources.imgmode.luminosity import luminosity
-from resources.imgmode.effect import effect
-from resources.imgmode.size import size
-from resources.imgmode.slitscan import slitscan
-from resources.cammode.photo import Photo
-from resources.cammode.qrcode import QrCode
-from resources.cammode.romanphoto import RomanPhoto
+from resources.modes import Enhancer
 
 from resources.log import LOG,log as l
-#from resources.enhancer.ying import Ying_2017_CAIP
+from resources.camera import CAMERA
+
+from resources.qrcode import QRCODE
 
 log = LOG.log
-
-
-
 
 #BATTERY OPTION
 BATLOW = 4400
 BATVERYLOW = 4300
 BATCHARGE = 5300
-
 
 # default mode timeout
 TIMEOUT = 3
@@ -64,77 +54,108 @@ TIMEOUT = 3
 #Auto off delay
 AUTOOFF = 600
 
-
-
-
-
-BTNAUTO = BUTTONS.register(MPR121, AUTO)
-BTNLUM = BUTTONS.register(MPR121, LUM)
-BTNSIZE = BUTTONS.register(MPR121, FORMAT)
-BTNVAL0 = BUTTONS.register(MPR121, VALUE0)
-BTNVAL1 = BUTTONS.register(MPR121, VALUE1)
-BTNVAL2 = BUTTONS.register(MPR121, VALUE2)
-BTNVAL3 = BUTTONS.register(MPR121, VALUE3)
-BTNQRCODE = BUTTONS.register(MPR121, VALUE1)
-BTNPRINTMANUAL = BUTTONS.register(MPR121, VALUE2)
-
 import operator
+
+class power(object) :
+    #POWER.registerEvent(self.onLowBattery,LOWER,BATLOW)
+    #POWER.registerEvent(self.onVeryLowBattey,LOWER,BATVERYLOW)
+    #POWER.registerEvent(self.onCharge,HIGHER,BATCHARGE)        
+
+    def __init__(self) :
+        self.stopped = False
+        self.lastTouched = time.time()
+        threading.Thread(target=self.autostop).start()
+    
+    def ontouched(self) :    
+        self.lastTouched = time.time()
+    
+    def autostop(self) :
+        while not self.stopped :
+            if time.time() >= (self.lastTouched + (AUTOOFF)) :                
+                self.halt()            
+            time.sleep(10)
+    
+    def onForceHalt(self) :
+        print ('Forced Halt')
+        self.halt()
+
+    def halt(self) :
+        try :
+            self.stop()
+        except :
+            raise
+        finally :
+            os.system("shutdown now -h")
 
 class polapi:
     def __init__(self):
         log('Enter in Polapi Main Application')
-        self.timer = threading.Event()
-        self.timeoutset = threading.Event()        
-        self.lockTimer = threading.Lock()                
-        self.imgmodes = [luminosity(), size(), effect(), slitscan()]
-        self.imgselectedmode = None
-        for mode in self.imgmodes:
-            mode.setMode(-1)
-        self.buttons = [BTNVAL0, BTNVAL1, BTNVAL2, BTNVAL3]
+        self.btnauto = BUTTONS.register(MPR121, AUTO)
+        self.btnlum = BUTTONS.register(MPR121, LUM)
+        self.btnsize = BUTTONS.register(MPR121, FORMAT)
+        self.btnval0 = BUTTONS.register(MPR121, VALUE0)
+        self.btnval1 = BUTTONS.register(MPR121, VALUE1)
+        self.btnval2 = BUTTONS.register(MPR121, VALUE2)
+        self.btnval3 = BUTTONS.register(MPR121, VALUE3)
+        
+        
+        
+        self.btnprintmanual = BUTTONS.register(MPR121, VALUE2)
+        self.btnreprint = BUTTONS.register(MPR121, VALUE3)
+        self.btnshutter = BUTTONS.register(ATTINY)
+
+        self.btnauto.registerEvent(self.onAuto, ONPRESSED)
+        self.btnauto.registerEvent(self.onlock, ONPRESSED, 3)
+        self.btnauto.registerEvent(self.onbuzz, ONTOUCHED)
+        
+        self.btnlum.registerEvent(self.onModeSelect, ONPRESSED, 0, 'Luminosity')
+        self.btnlum.registerEvent(self.onModeSelect, ONPRESSED, 2, 'Effect')
+        self.btnlum.registerEvent(self.onbuzz, ONTOUCHED)
+        
+        self.btnsize.registerEvent(self.onModeSelect, ONPRESSED, 0, 'Size')
+        self.btnsize.registerEvent(self.onModeSelect, ONPRESSED, 2, 'Slitscan') 
+        self.btnsize.registerEvent(self.onbuzz, ONTOUCHED)               
+
+        self.btnprintmanual.registerEvent(self.onPrintManual, ONPRESSED, 2)
+        self.btnprintmanual.registerEvent(self.onbuzz, ONTOUCHED)               
+
+        self.btnreprint.registerEvent(self.onReprint, ONPRESSED, 2)
+        self.btnreprint.registerEvent(self.onbuzz, ONTOUCHED)               
+        
+        self.btnshutter.registerEvent(self.onShutterTouched, ONTOUCHED)
+        self.btnshutter.registerEvent(self.onPhoto, ONRELEASED)
+
+        self.buttons = [self.btnval0, self.btnval1, self.btnval2, self.btnval3]
         for button in self.buttons:
-            button.disable()
-       
-        self.stopped = False
-        self.lastTouched = time.time()
-
-        self.lock = False
-        self.modes = {'photo' : Photo(self.imgmodes,self.ontouched,self.oncancel),'qrcode' : QrCode(self.imgmodes,self.ontouched,self.oncancel), 'roman' : RomanPhoto(self.imgmodes,self.ontouched,self.oncancel)}
-        print self.modes
-
-        self.actualmode = self.modes['photo']
-        print self.actualmode
-        self.actualmode.enable()
-
-        threading.Thread(target=self.timeout).start()
-        threading.Thread(target=self.autostop).start()
+            button.disable()        
         
-        BUZZ.buzz(READY)
-
-        BTNAUTO.registerEvent(self.onAuto, ONPRESSED)
-        BTNAUTO.registerEvent(self.onlock, ONPRESSED, 3)
-        BTNLUM.registerEvent(self.onImgModeSelect, ONPRESSED, 0, 0)
-        BTNLUM.registerEvent(self.onImgModeSelect, ONPRESSED, 2, 2)
-        BTNSIZE.registerEvent(self.onImgModeSelect, ONPRESSED, 0, 1)
-        BTNSIZE.registerEvent(self.onImgModeSelect, ONPRESSED, 2, 3)
-
-        BTNAUTO.registerEvent(self.ontouched, ONTOUCHED)
-        BTNLUM.registerEvent(self.ontouched, ONTOUCHED)
-        BTNSIZE.registerEvent(self.ontouched, ONTOUCHED)
-
-        
-
-        BTNPRINTMANUAL.registerEvent(self.onPrintManual, ONPRESSED, 3)
-        BTNPRINTMANUAL.registerEvent(self.ontouched, ONTOUCHED)
-        BTNQRCODE.registerEvent(self.onQrCodeMode, ONPRESSED, 3)
-        BTNQRCODE.registerEvent(self.ontouched, ONTOUCHED)
         for i,btn in enumerate(self.buttons) :
             btn.registerEvent(self.onValue, ONPRESSED, 0, i)
-
-        POWER.registerEvent(self.onLowBattery,LOWER,BATLOW)
-        POWER.registerEvent(self.onVeryLowBattey,LOWER,BATVERYLOW)
-        POWER.registerEvent(self.onCharge,HIGHER,BATCHARGE)        
-
+            #btn.registerEvent(self.onbuzz, ONTOUCHED)
+                       
         
+        QRCODE.registerEvent(self.onRomanPhoto,'r')
+        
+        self.timer = threading.Event()
+        self.timeoutset = threading.Event()   
+        self.imageReady = threading.Event()
+        self.imageReady.clear()
+        self.lockTimer = threading.Lock()  
+        self.enhancer = Enhancer()              
+        
+        
+        self.stopped = False
+        
+        self.lock = False
+        
+        self._lastphoto = None
+
+        threading.Thread(target=self.timeout).start()
+        threading.Thread(target=self.printPhoto).start()
+        
+                
+        BUZZ.buzz(READY)
+                
     def onPrintManual(self) :
         print ('Print manual')
         BUZZ.buzz(OK)
@@ -142,64 +163,96 @@ class polapi:
             for line in manual :
                 PRINTER.print_txt(line)        
 
-    def onQrCodeMode(self) :        
-        if self.actualmode == self.modes['qrcode'] :
-            self.oncancel()
+    def onReprint(self) :
+        if self._lastphoto :
+            BUZZ.buzz(OK)
+            self.printPhoto(self._lastphoto) 
         else :
-            self.oncancel('qrcode')
+            BUZZ.buzz(ERROR)
+
+    
+    def printPhoto(self):
+        log("Print photo")  
+        self.imageReady.wait()
+        while not self.stopped:                                                          
+            img = self.enhancer.postProcess(self.picture)        
+            if img is not None:            
+                self.enhancer.disable()            
+                PRINTER.printToPage(img,self.onprintfinished)
+            else :            
+                print ('******************img = None, enable btn shutter')
+                QRCODE.enable()
+                time.sleep(1)
+                self.btnshutter.enable()                
+            self.imageReady.clear()
+            self.imageReady.wait()
+
+    def onShutterTouched(self):
+        log("Shutter touched")  
+        QRCODE.disable()        
+        CAMERA.getPhoto(self.onImageReady)        
+    
+    def onPhoto(self):
+        log("Photo mode selected")
+        print ('************disable btn shutter')
+        self.btnshutter.disable() 
         
-    def onLowBattery(self) :
-        print ('Low Battery')
+    def onRomanPhoto(self,data) :
+        self.enhancer.modes['Slitscan'].disable()
+        self.enhancer.modes['Romanphoto'].enable()
+        self.enhancer.modes['Romanphoto'].setMode(data)
     
-    def onVeryLowBattey(self) :
-        print ('Very Low Battery')
+    def onImageReady(self, picture):  
+        print ('Image ready')
+        self.imageReady.set()                
+        self.picture = picture
     
-    def onCharge(self) :
-        pass
-    
-    def onForceHalt(self) :
-        print ('Forced Halt')
-        self.halt()
-                           
+    def onprintfinished(self):                    
+        self.enhancer.enable()        
+        self.enhancer.modes['Slitscan'].enable()
+        QRCODE.enable()
+        self.btnshutter.enable()
+        BUZZ.buzz(OK)
+
+                                        
     def onAuto(self):
         if not self.lock:
             self.cancelTimer()
-            for mode in self.imgmodes:
-                mode.setMode(-1)
+            self.enhancer.default()             
             BUZZ.buzz(OK)
 
-    def ontouched(self):
-        BUZZ.buzz(TOUCHED)
-        self.lastTouched = time.time()
+    def onbuzz(self):
+        BUZZ.buzz(TOUCHED)    
 
     def onlock(self):
         self.cancelTimer()
         if self.lock:
             log("Unlock buttons")
-            BTNLUM.enable()
-            BTNSIZE.enable()
-            BTNQRCODE.enable()
-            BTNPRINTMANUAL.enable()
-            #BTNREPRINT.enable()
+            self.btnlum.enable()
+            self.btnsize.enable()
+            self.btnreprint.enable()
+            self.btnprintmanual.enable()
         else:
             log("lock buttons")
-            BTNLUM.disable()
-            BTNSIZE.disable()
-            BTNQRCODE.disable()
-            BTNPRINTMANUAL.disable()
-            #BTNREPRINT.disable()
+            self.btnlum.disable()
+            self.btnsize.disable()
+            self.btnreprint.disable()
+            self.btnprintmanual.disable()
             for button in self.buttons:
                 button.disable()
         self.lock = not self.lock
         BUZZ.buzz(OK)
 
-    def onImgModeSelect(self, mode):
+    def onModeSelect(self, mode):
         log("Enter in select mode")
-        if mode > 1 :
+        if mode in ('Effect','Slitscan') :
             BUZZ.buzz(TOUCHED)
         self.cancelTimer()
         self.setTimer()    
-        self.imgselectedmode = mode 
+        self.selectedmode = mode 
+        self.btnprintmanual.disable()
+        self.btnreprint.disable()
+        
         for button in self.buttons:
             button.enable()
 
@@ -215,54 +268,36 @@ class polapi:
             self.timer.wait()            
             if not self.timeoutset.wait(timeout):
                 log("Select mode timeout")
-                self.imgselectedmode = None
+                self.selectedmode = None
                 BUZZ.buzz(CANCEL)
-                for button in self.buttons:
-                    button.disable()            
+            for button in self.buttons:
+                   button.disable()
+            self.btnprintmanual.enable()
+            self.btnreprint.enable()
+             
             self.timer.clear()
             self.timeoutset.clear()
 
     def onValue(self, val):
         log("Select choice done")
         self.cancelTimer()
-        self.imgmodes[self.imgselectedmode].setMode(val)
-        BUZZ.buzz(OK)
-        for button in self.buttons:
-            button.disable()
-        self.imgselectedmode = None
+        print ('set enhancer mode',self.selectedmode,val)
+        self.enhancer.setMode(self.selectedmode,val)
+        BUZZ.buzz(OK)        
+        self.selectedmode = None
     
-    def oncancel(self,nextmode=None,*args,**kwargs) :
-        print ('oncancel, set mode to ',nextmode)
-        self.actualmode.disable()
-        self.actualmode = self.modes[nextmode] if nextmode!= None else self.modes['photo']
-        self.actualmode.enable(*args,**kwargs)
-        print ('oncancel, modeset to ',nextmode)
-
     def stop(self) :
         self.stopped = True
         self.timer.set()
+        self.imageReady.set()
         self.cancelTimer()
-        self.actualmode.disable()                
+        self.enhancer.disable()
         CAMERA.stop()
         BUTTONS.stop()
         PRINTER.stop()
         BUZZ.stop()
         POWER.stop()
     
-    def autostop(self) :
-        while not self.stopped :
-            if time.time() >= (self.lastTouched + (AUTOOFF)) :                
-                self.halt()            
-            time.sleep(10)
-    
-    def halt(self) :
-        try :
-            self.stop()
-        except :
-            raise
-        finally :
-            os.system("shutdown now -h")
-
 
 
 def signal_handler(signal, frame):
