@@ -26,7 +26,7 @@ from resources.resource import Resource, queue_call
 import RPi.GPIO as GPIO
 
 # GPIO PIN ID
-BUZZER = 26
+BUZZER = 18
 
 
 GPIO.setmode(GPIO.BCM)

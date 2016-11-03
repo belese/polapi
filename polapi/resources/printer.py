@@ -1,3 +1,4 @@
+import time
 from threading import Thread, Lock
 from thermal import ThermalPrinter
 from camera import CAMERA
@@ -35,7 +36,8 @@ class Printer(Resource):
             height = int((float(im_height) * float(ratio)))
             image = image.resize((PRINTER_HEIGHT, height), Image.ANTIALIAS)
             self.printer.printImage(image, Laat)
-            self.printer.feed(3)   
+            self.printer.feed(3)
+            time.sleep(3)   
 
     @queue_call
     def print_txt(self, text):

@@ -53,7 +53,12 @@ class Resource():
     def start(self):
         while not self.terminated:
             i, fn, arg, kw = self.queue.get()
-            rc = fn(self, *arg, **kw)
+            try :
+                rc = fn(self, *arg, **kw)
+            except Exception as e:
+                rc = None
+                print ('Unmangaed esxception',e)
+                raise
             self.onReturn(i, rc)
         print ('ressources thread stopped')
 

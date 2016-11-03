@@ -25,6 +25,7 @@ import signal
 import sys
 import threading
 import time
+import os
 from PIL import Image, ImageEnhance
 
 from resources.printer import PRINTER
@@ -42,15 +43,16 @@ log = LOG.log
 # GPIO PIN ID
 DECLENCHEUR = 4  # gpio
 
+
 # MPR121 PIN ID
-AUTO = 2
-LUM = 1
-FORMAT = 0
+AUTO = 5
+LUM = 4
+FORMAT = 6
 
 VALUE0 = 3
-VALUE1 = 4
-VALUE2 = 5
-VALUE3 = 6
+VALUE1 = 2
+VALUE2 = 1
+VALUE3 = 0
 
 #BATTERY OPTION
 BATLOW = 4000
@@ -60,6 +62,11 @@ BATCHARGE = 5300
 
 # default mode timeout
 TIMEOUT = 3
+
+#Auto off delay
+AUTOOFF = 600
+CAMERAAUTOOFF = 120
+
 # Luminosity Option
 LOW = 10
 MEDIUM_LOW = 11
@@ -140,6 +147,8 @@ LUMHIGH = {"sharpness": 0,
            }
 
 BTNSHUTTER = BUTTONS.register(ATTINY)
+BTNFORCESTOP = BUTTONS.register(ATTINY)
+
 BTNAUTO = BUTTONS.register(MPR121, AUTO)
 BTNLUM = BUTTONS.register(MPR121, LUM)
 BTNSIZE = BUTTONS.register(MPR121, FORMAT)
@@ -263,13 +272,18 @@ class polapi:
         self.slitscanobject = None
         self.slitscan = False
         self.stopped = False
-        threading.Thread(target=self.timeout).start()
+        self.sleeping = False
+        self.lastTouched = time.time()
 
+        threading.Thread(target=self.timeout).start()
+        threading.Thread(target=self.autostop).start()
+
+        BTNSHUTTER.registerEvent(self.wakeup, ONTOUCHED)
         BTNSHUTTER.registerEvent(self.onShutterTouched, ONTOUCHED)
         BTNSHUTTER.registerEvent(self.onPhoto, ONPRESSED)
         BTNSHUTTER.registerEvent(self.onSlitScan, ONPRESSED, 1)
         BTNSHUTTER.registerEvent(self.onStopSlitScan, ONRELEASED)
-
+        BTNFORCESTOP.registerEvent(self.onForceHalt, ONPRESSED, 2)
         BUZZ.buzz(READY)
 
         BTNAUTO.registerEvent(self.onAuto, ONPRESSED)
@@ -307,6 +321,9 @@ class polapi:
     def onCharge(self) :
         pass
     
+    def onForceHalt(self) :
+        self.halt()
+    
     def onSlitScanMode(self):
         if self.slitscanmode == SCAN_MODE:
             log("Select Scan mode fix")
@@ -321,8 +338,21 @@ class polapi:
             self.slitscanmode = SCAN_MODE
             BUZZ.buzz(REPEAT(3))
 
+    def wakeup(self) :
+        if self.sleeping :
+            BTNFORCESTOP.disable()
+            CAMERA.wake()
+            self.sleeping = False
+    
+    def sleep(self) :
+        if not self.sleeping :
+            BTNFORCESTOP.enable()
+            CAMERA.sleep()
+            self.sleeping = True
+        
     def onShutterTouched(self):
-        log("Shutter touched")
+        log("Shutter touched")        
+        self.lastTouched = time.time()        
         self.picture = CAMERA.getPhoto()
         if self.slitscanmode == SCAN_MODE_LIVE:
             for mode in self.modes:
@@ -353,9 +383,10 @@ class polapi:
     def onStopSlitScan(self):
         log('Shutter released')
         CAMERA.stopSlitScan()
-        CAMERA.sleep()
+        self.sleep()
         BTNSHUTTER.disable()
-        if self.slitscanmode == SCAN_MODE_LIVE:
+        BTNFORCESTOP.enable()
+        if self.slitscan and self.slitscanmode == SCAN_MODE_LIVE:
             for mode in self.modes:
                 mode.setMode(self.mode)
 
@@ -373,7 +404,9 @@ class polapi:
     def onPrinterEvent(self, event, arg):
         if event == PRINTER.RETURN and arg[0] == self.printID:
             log("Print finished")
-            CAMERA.wake()
+            BUZZ.buzz(OK)
+            self.wakeup()
+            BTNFORCESTOP.disable()
             BTNSHUTTER.enable()
 
     def onAuto(self):
@@ -388,6 +421,8 @@ class polapi:
 
     def ontouched(self):
         BUZZ.buzz(TOUCHED)
+        self.lastTouched = time.time()
+        self.wakeup()
 
     def onlock(self):
         self.cancelTimer()
@@ -411,8 +446,6 @@ class polapi:
         self.cancelTimer()
         self.setTimer()
         self.lastMode = self.mode    
-        if mode == self.mode:
-            return
         self.mode = mode
         for button in self.buttons:
             button.enable()
@@ -443,16 +476,47 @@ class polapi:
         BUZZ.buzz(OK)
         for button in self.buttons:
             button.disable()
+            
+    def stop(self) :
+        self.stopped = True
+        self.timer.set()
+        self.cancelTimer()        
+        CAMERA.stop()
+        BUTTONS.stop()
+        PRINTER.stop()
+        BUZZ.stop()
+        POWER.stop()
+    
+    def autostop(self) :
+        while not self.stopped :
+            if time.time() >= (self.lastTouched + (AUTOOFF)) :                
+                self.halt()            
+            if not  self.sleeping and time.time() >= (self.lastTouched + (CAMERAAUTOOFF)) :
+                self.sleep()                
+            time.sleep(1)
+    
+    def halt(self) :
+        try :
+            self.stop()
+        except :
+            raise
+        finally :
+            os.system("shutdown now -h")
+
 
 
 def signal_handler(signal, frame):
     print('You pressed Ctrl+C!')
 
-CAM = polapi()
-signal.signal(signal.SIGINT, signal_handler)
-print('Press Ctrl+C to quit')
-signal.pause()
-CAMERA.stop()
+try:
+    CAM = polapi()
+    signal.signal(signal.SIGINT, signal_handler)
+    print('Press Ctrl+C to quit')
+    signal.pause()
+except :
+    raise
+finally :
+    CAM.stop()
 
 '''
 try:

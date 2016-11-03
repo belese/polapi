@@ -129,7 +129,7 @@ class Mpr121:
     def register(self, pinid):
         self.registerPinId.append(pinid)
 
-    def _onIrq(self,gpioid):                
+    def _onIrq(self,gpioid):     
         current_touched = self.cap.touched()
         if current_touched != self.last_touched:
             for i in self.registerPinId:
@@ -218,9 +218,11 @@ class Button(Resource):
 
     @queue_call
     def _onPress(self):
+        print ('In button _onPress')
         with self.lock:
             self.buttonRelease.clear()
             self.buttonPressed.set()
+        print ('Quit button _onPress')
 
     @queue_call
     def _onRelease(self):

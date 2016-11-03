@@ -28,8 +28,7 @@ ATTINY_SLAVE_ADDR = 10
 
 class Attiny85 :
 	def __init__(self) :
-		self.bus = smbus.SMBus(1)
-		self.lastvcc = 0
+		self.bus = smbus.SMBus(1)		
 	
 	def getCommand(self,command):    
 		data = []
@@ -58,11 +57,9 @@ class Attiny85 :
 		data = self.getCommand(0x01)
 		if len(data) == 2 :
 			try :
-				vcc = (1024 * 1100) / ((data[1] << 8) | data[0])
-				self.lastvcc = vcc
+				vcc = (1024 * 1000) / ((data[1] << 8) | data[0])				
 			except ZeroDivisionError:
-				return self.lastvcc
-
+				return self.getVoltage()
 		return vcc
 	
 	def stop(self) :

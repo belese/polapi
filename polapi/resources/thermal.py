@@ -36,6 +36,7 @@
 from __future__ import print_function
 from serial import Serial
 import time
+import os
 import sys
 from threading import Lock
 
@@ -58,6 +59,7 @@ class ThermalPrinter(Serial):
     writeToStdout = False
 
     def __init__(self, port, baudrate=9600,*args,**kwargs):
+        os.system("../rpirtscts.sh")
         Serial.__init__(self, port, baudrate,*args,**kwargs)
         #self.wake()
         self.reset()

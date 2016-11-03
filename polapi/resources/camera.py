@@ -154,20 +154,23 @@ class Camera(Resource):
         self.initCamera()
         self.camlock = threading.Lock()
         self.img = None
-        self.keepres = None        
+        self.keepres = None
+        self.resolution =  SLITSCAN_SIZE
 
     @queue_call
     def setSettings(self, settings):
         for param in settings.keys():
             setattr(self.camera, param, settings[param])
+        self.resolution = self.camera.resolution 
 
     @queue_call
     def initCamera(self):
         print ('Start camera')
-        self.camera = picamera.PiCamera()
-        self.camera.framerate = 90
-        self.camera.resolution = SLITSCAN_SIZE
-        #self.camera.vflip = True
+        with self.camlock :
+            self.camera = picamera.PiCamera()
+            self.camera.framerate = 90
+            self.camera.resolution = self.resolution 
+            #self.camera.vflip = True
 
     @queue_call
     def getPhoto(self):
@@ -177,15 +180,16 @@ class Camera(Resource):
         stream.seek(0)
         return Image.open(stream)
 
+    
     def startSlitScan(self, mode=SCAN_MODE, slitscansize=1):
         if mode == SCAN_MODE:
-            slitScanProcess = ScanMode(self.camera.resolution)
+            slitScanProcess = ScanMode(self.resolution)
         elif mode == SCAN_MODE_FIX:
-            slitScanProcess = ScanModeFix(self.camera.resolution)
+            slitScanProcess = ScanModeFix(self.resolution)
         elif mode == SCAN_MODE_LIVE:
             slitScanProcess = ScanModeLive(
-                self.camera.resolution, slitscansize)
-        self.startRecording(slitScanProcess, self.camera.resolution)
+                self.resolution, slitscansize)
+        self.startRecording(slitScanProcess, self.resolution)
         return slitScanProcess
 
     @queue_call
@@ -202,11 +206,11 @@ class Camera(Resource):
         print ('in stop recording')
         try :
             self.camera.stop_recording()
-            if self.keepres:
-                self.camera.resolution = self.keepres
-                self.keepres = None
+            #if self.keepres:
+            #    self.camera.resolution = self.keepres
+            #    self.keepres = None
         except :
-            pass
+            raise
         finally :
             print ('stop recoreding, release lock')
             self.camlock.release()
@@ -214,6 +218,7 @@ class Camera(Resource):
     def stopSlitScan(self):
         self.stopRecording()
 
+    @queue_call
     def stop(self):
         if self.camera.recording:
             self.stopSlitScan()
@@ -222,19 +227,14 @@ class Camera(Resource):
         Resource.stop(self)
 
     @queue_call
-    def sleep(self):
-        print ('Wait pause lock')
+    def sleep(self):        
         with self.camlock:
             print ('Pause camera')
             self.camera.close()
 
-    @queue_call
-    def wake(self):
-        with self.camlock:
-            self.camera = picamera.PiCamera()
-            self.camera.framerate = 90
-            self.camera.resolution = SLITSCAN_SIZE
-            time.sleep(2)
+    
+    def wake(self):        
+        self.initCamera()
 
 
 CAMERA = Camera()

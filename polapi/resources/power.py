@@ -31,14 +31,14 @@ HIGHER = 0x02
 
 class Power :   
     def __init__(self) :
-        self.stop = False
+        self.stopped = False
         self.voltages = []
         self.events = {LOWER: [], HIGHER: []}
         self.thread = Thread(target=self._callEvent)
         self.thread.start()
             
     def stop(self) :
-		self.stop = True
+		self.stopped = True
 		
     def getVoltage(self) :
         volt = False            
@@ -56,7 +56,7 @@ class Power :
         for i in range(40) :                  
             self.voltages.append(self.getVoltage())
         
-        while not self.stop :
+        while not self.stopped :
             avg = sum(self.voltages)/len(self.voltages) 
             print avg
             for event in self.events[LOWER] :
