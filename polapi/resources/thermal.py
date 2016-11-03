@@ -57,12 +57,14 @@ class ThermalPrinter(Serial):
     firmwareVersion = 268
     writeToStdout = False
 
-    def __init__(self, port, baudrate=9600):
-        Serial.__init__(self, port, baudrate)
-        self.wake()
+    def __init__(self, port, baudrate=9600,*args,**kwargs):
+        Serial.__init__(self, port, baudrate,*args,**kwargs)
+        #self.wake()
         self.reset()
+        self.setPrintSettings()
+        self.setPrintDensity()
 
-    def setPrintSettings(self, heatdot=5, heattime=180, heatinterval=160):
+    def setPrintSettings(self, heatdot=5, heattime=120, heatinterval=250):
         self.writeBytes(
             27,       # Esc
             55,       # 7 (print settings)
@@ -70,7 +72,7 @@ class ThermalPrinter(Serial):
             heattime,  # Lib default
             heatinterval)       # Heat interval
 
-    def setPrintDensity(self, density=0, breaktime=0):
+    def setPrintDensity(self, density=12, breaktime=7):
         self.writeBytes(
             18,  # DC2
             35,  # Print density
@@ -309,11 +311,11 @@ class ThermalPrinter(Serial):
                 sleep = ((float(blackdotbit) / 48)**3) * 1700
                 sleeptime += sleep / 10000000
                 if sleeptime > 0.5:
-                    time.sleep(sleeptime - (time.time() - start))
+                    #time.sleep(sleeptime - (time.time() - start))
                     sleeptime = 0
             total_raw += nb_row
 
-    def printBitmap(self, w, h, bitmap, LaaT=False):
+    def printBitmap(self, w, h, bitmap, LaaT=False):        
         rowBytes = (w + 7) / 8  # Round up to next byte boundary
         if rowBytes >= 48:
             rowBytesClipped = 48  # 384 pixels max width
@@ -339,9 +341,9 @@ class ThermalPrinter(Serial):
 
             # Timeout wait happens here
             self.writeBytes(18, 42, chunkHeight, rowBytesClipped)
-            sleeptime = 0.05
+            #sleeptime = 0.05
             for y in range(chunkHeight):
-                blackdotbit = 0
+                #blackdotbit = 0
                 for x in range(rowBytesClipped):
                     if self.writeToStdout:
                         sys.stdout.write(
@@ -349,14 +351,14 @@ class ThermalPrinter(Serial):
                     else:
                         super(ThermalPrinter,
                               self).write(chr(bitmap[i]))
-                        blackdotbit += bin(bitmap[i])[2:].count('1')
+                        #blackdotbit += bin(bitmap[i])[2:].count('1')
                     i += 1
                 i += rowBytes - rowBytesClipped
-                sleep = ((float(blackdotbit) / 48)**3) * 1700
-                sleeptime += sleep / 10000000
-                if sleeptime > 0.5:
-                    time.sleep(sleeptime)
-                    sleeptime = 0
+                #sleep = ((float(blackdotbit) / 48)**3) * 1700
+                #sleeptime += sleep / 10000000
+                #if sleeptime > 0.5:
+                #    time.sleep(sleeptime)
+                #    sleeptime = 0
 
         self.prevByte = '\n'
         print ('finish printing')

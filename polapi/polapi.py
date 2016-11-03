@@ -28,12 +28,13 @@ import time
 from PIL import Image, ImageEnhance
 
 from resources.printer import PRINTER
-from resources.buttons import GPIO, MPR121, BUTTONS, ONTOUCHED, ONPRESSED, ONRELEASED
+from resources.buttons import GPIO, MPR121, ATTINY, BUTTONS, ONTOUCHED, ONPRESSED, ONRELEASED
 from resources.camera import CAMERA, SCAN_MODE, SCAN_MODE_FIX, SCAN_MODE_LIVE
 from resources.vibrator import BUZZ
 from resources.power import POWER,LOWER,HIGHER
 
 from resources.log import LOG
+#from resources.enhancer.ying import Ying_2017_CAIP
 
 log = LOG.log
 
@@ -138,7 +139,7 @@ LUMHIGH = {"sharpness": 0,
            "awb_mode": 'sunlight',
            }
 
-BTNSHUTTER = BUTTONS.register(GPIO, DECLENCHEUR)
+BTNSHUTTER = BUTTONS.register(ATTINY)
 BTNAUTO = BUTTONS.register(MPR121, AUTO)
 BTNLUM = BUTTONS.register(MPR121, LUM)
 BTNSIZE = BUTTONS.register(MPR121, FORMAT)
@@ -167,12 +168,14 @@ class luminosity(mode):
     def setMode(self, value):
         log("Select Luminosity %d" % value)
         self.value = value
-        CAMERA.setLuminosity(self.values[value])
+        CAMERA.setSettings(self.values[value])        
 
     def postProcess(self, img):
         log("Luminosity post process")
         # img.save('original.jpg')
+        #img = Ying_2017_CAIP(img) 
         img = ImageEnhance.Color(img)
+        
         img = img.enhance(0)
         # img.save('bw.jpg')
         img = ImageEnhance.Brightness(img)
@@ -247,7 +250,7 @@ class polapi:
         self.lockTimer = threading.Lock()
         self.lock = False
         self.mode = -1
-        self.lastmode = -1
+        self.lastMode = -1
         self.picture = None
         self.printID = None
         self.modes = [luminosity(), size(), effect(), shader()]
@@ -291,18 +294,18 @@ class polapi:
 
         CAMERA.register(self.onCameraEvent)
         PRINTER.register(self.onPrinterEvent)
-        POWER.registerEvent(onLowBattery,LOWER,BATLOW)
-		POWER.registerEvent(onVeryLowBattey,LOWER,BATVERYLOW)
-		POWER.registerEvent(onCharge,HIGHER,BATCHARGE)
+        POWER.registerEvent(self.onLowBattery,LOWER,BATLOW)
+        POWER.registerEvent(self.onVeryLowBattey,LOWER,BATVERYLOW)
+        POWER.registerEvent(self.onCharge,HIGHER,BATCHARGE)
 
     def onLowBattery(self) :
-		pass
-	
-	def onVeryLowBattey(self) :
-		pass
-	
-	def onCharge(self) :
-		pass
+        pass
+    
+    def onVeryLowBattey(self) :
+        pass
+    
+    def onCharge(self) :
+        pass
     
     def onSlitScanMode(self):
         if self.slitscanmode == SCAN_MODE:
@@ -349,8 +352,9 @@ class polapi:
 
     def onStopSlitScan(self):
         log('Shutter released')
-        BTNSHUTTER.disable()
         CAMERA.stopSlitScan()
+        CAMERA.sleep()
+        BTNSHUTTER.disable()
         if self.slitscanmode == SCAN_MODE_LIVE:
             for mode in self.modes:
                 mode.setMode(self.mode)
@@ -369,6 +373,7 @@ class polapi:
     def onPrinterEvent(self, event, arg):
         if event == PRINTER.RETURN and arg[0] == self.printID:
             log("Print finished")
+            CAMERA.wake()
             BTNSHUTTER.enable()
 
     def onAuto(self):
@@ -405,9 +410,9 @@ class polapi:
         log("Enter in select mode")
         self.cancelTimer()
         self.setTimer()
+        self.lastMode = self.mode    
         if mode == self.mode:
             return
-        self.lastmode = self.mode
         self.mode = mode
         for button in self.buttons:
             button.enable()
@@ -427,8 +432,7 @@ class polapi:
                 self.mode = self.lastMode
                 BUZZ.buzz(CANCEL)
                 for button in self.buttons:
-                    button.disable()
-                self.mode = self.lastMode
+                    button.disable()            
             self.timer.clear()
             self.timeoutset.clear()
 
@@ -444,7 +448,13 @@ class polapi:
 def signal_handler(signal, frame):
     print('You pressed Ctrl+C!')
 
+CAM = polapi()
+signal.signal(signal.SIGINT, signal_handler)
+print('Press Ctrl+C to quit')
+signal.pause()
+CAMERA.stop()
 
+'''
 try:
     CAM = polapi()
     signal.signal(signal.SIGINT, signal_handler)
@@ -455,6 +465,7 @@ finally:
     BUTTONS.stop()
     PRINTER.stop()
     BUZZ.stop()
-    POWER.stop()
+    //POWER.stop()
     log('Main exit')
     sys.exit(0)
+'''
