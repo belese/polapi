@@ -11,17 +11,17 @@ class QrCode(lastframe):
         self.cb = onqrcodecb        
         threading.Thread(target = self.detect).start()
     
-    def detect(self) :
-        i = 0
-        while not self.finished.is_set() :
-            i+=1
+    def detect(self) :        
+        #while not self.finished.is_set() :
+        while not self.finished.is_set() :            
             frame = self.read()
+            if not frame :
+                continue
             print ('check Qrcode')
             frame = bytes_to_rgb(frame,self.resolution)               
             frame = Image.fromarray(frame)
 
-            #frame = Image.frombuffer('L', self.resolution, frame, "raw", 'L', 0, 1)
-            frame.save('qrcode%d.jpeg'%i, "JPEG")
+            #frame = Image.frombuffer('L', self.resolution, frame, "raw", 'L', 0, 1)            
             barcodes = pyzbar.decode(frame)            
             # loop over the detected barcodes            
             for barcode in barcodes:                

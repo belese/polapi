@@ -65,9 +65,9 @@ class Photo(mode) :
         log("Shutter touched")
         self.ontouch()
         self.imageReady.clear()
-        self.picture = CAMERA.getPhoto(self.onImageReady)        
+        CAMERA.getPhoto(self.onImageReady)        
         self.slitscanobject = SlitScan(CAMERA.resolution,self.slitscanmode)
-        CAMERA.startMode(self.slitscanobject)
+        CAMERA.startMode(self.slitscanobject,format='yuv')
     
     def onPhoto(self):
         log("Photo mode selected")             
@@ -81,10 +81,13 @@ class Photo(mode) :
         log('Shutter released')
         CAMERA.stopMode()                
         self.sleep()
-        if self.slitscan and self.slitscanmode in (SCAN_MODE, SCAN_MODE_FIX):            
+        if self.slitscan and self.slitscanmode in (SCAN_MODE, SCAN_MODE_FIX):   
+            print ('before self.slitscan get image')         
             img = self.slitscanobject.getImage()
+            print ('after self.slitscan get image')         
             self.onimage(img)
-            self.picture = img            
+            self.picture = img
+            print ('we ve got an image',img)            
             self.printPhoto(img)
         elif self.slitscan :
             for mode in self.modes:

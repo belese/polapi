@@ -8,7 +8,7 @@ from resources.vibrator import BUZZ,OK,READY,CANCEL,TOUCHED,ERROR,REPEAT
 from resources.wiring import DECLENCHEUR,AUTO,LUM,VALUE0,VALUE1,VALUE2,VALUE3
 from resources.log import LOG,log as l
 from resources.iocamera.facedetection import face_detection
-from resources.libs.romanphoto import RomanPhoto as rp
+from resources.libs.romanphoto import Dialogues,RomanPhoto as rp
 from . import mode
 #from resources.enhancer.ying import Ying_2017_CAIP
 
@@ -33,8 +33,7 @@ class RomanPhoto(mode) :
        
         BTNFORCESTOP.disable()
         #BTNFORCESTOP.registerEvent(self.onForceHalt, ONPRESSED, 2)
-        #BTNFORCESTOP.registerEvent(self.wakeup, ONTOUCHED)
-            
+        #BTNFORCESTOP.registerEvent(self.wakeup, ONTOUCHED)            
                 
     def wakeup(self) :        
         if self.sleeping :
@@ -60,23 +59,20 @@ class RomanPhoto(mode) :
     
     def onFaceDetected(self,img,faces) :
         print ('find faces',img,faces)
-        if len(faces) >= 1 and self.enabled :
+        if len(faces) >= self.dialogue.nbpersons and self.enabled :
             self.disable()
-            BUZZ.buzz(OK)
-            #self.cancel('qrcode')
+            BUZZ.buzz(OK)            
             try :
-                for mode in self.modes:        
+                for mode in (self.modes[0],self.modes[2]):        
                     img = mode.postProcess(img)
+                    pass
             except Exception as e :
                 log('Exception',str(e),level=30)
                 BUZZ.buzz(ERROR)
                 raise
-            bull = rp(img,CAMERA.resolution,faces,self.dialogue)
-            imgbull = bull.getBubbles()
-            imgbull.save('roman.jpeg', "JPEG")
-            #img.save('romanimage.jpeg', "JPEG")
-            #img.paste(imgbull, (0,0))
-            #img.save('roman.jpeg', "JPEG")
+            bull = rp(img,img.size,faces,self.dialogue)
+            imgbull = bull.getBubbles()            
+            imgbull = self.modes[1].postProcess(imgbull)
             self.onimage(imgbull)    
             self.printPhoto(imgbull)
             
@@ -86,12 +82,13 @@ class RomanPhoto(mode) :
         PRINTER.printToPage(img,self.onprintfinished)
         
     def onprintfinished(self):                    
-        BUZZ.buzz(OK)        
+        BUZZ.buzz(OK)       
+        print('Printer finished, set qrcode mode') 
         self.oncancel('qrcode')            
     
     def enable(self,dialogue) :
         print ('set dialogue',dialogue)
-        self.dialogue = dialogue
+        self.dialogue = Dialogues(dialogue)
         mode.enable(self)
         CAMERA.camera.vflip = True
         BTNSHUTTER.enable()        

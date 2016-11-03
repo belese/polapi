@@ -41,6 +41,7 @@ class Dialogues :
         self.narrator = None
         self.dialogues = []
         self.starring = []
+        self.nbpersons = 0
 
         for line in data.split("|") :
             if not line[1:] :
@@ -53,16 +54,18 @@ class Dialogues :
                 self.starring.append(line[1:])
             elif line[0].isdigit()  :
                 self.dialogues.append((int(line[0]),line[1:]))
+                self.nbpersons = max(int(line[0]),self.nbpersons)
 
 
 
 class RomanPhoto :
-    def __init__(self,img,resolution,faces=[],dialogues=[]) :
+    def __init__(self,img,resolution,faces,dialogues) :
         self.resolution = resolution
         self.faces = faces
         self.nbfaces = len(faces)
-        self.dialogues = Dialogues(dialogues)
+        self.dialogues = dialogues
         self.im = img
+        print "Image size",self.im.size
         self.draw = ImageDraw.Draw(self.im)
 
 
@@ -73,14 +76,15 @@ class RomanPhoto :
         #    self.draw.rectangle((rectangle[0],rectangle[1],rectangle[0]+rectangle[2],rectangle[1] +rectangle[3]),fill="blue")
 
         font = ImageFont.truetype(font,size)
+        border = 10
 
         if self.dialogues.narrator :
-            narrator = self.findNarrator(squ)
+            narrator = self.findNarrator(squ[:])
             square,n = self.getSquareBubble(self.dialogues.narrator,narrator,(0,0,0,0),font,wr=20)
             self.im.paste(n, (square[0],square[1]))
-            squ.append((square[0],square[1],n.size[0],n.size[1]))
+            squ.append((square[0],square[1],n.size[0]+border,n.size[1]+border))
 
-        rects = self.findRectangle(squ)
+        rects = self.findRectangle(squ[:])
 
         for faceid,text in self.dialogues.dialogues :
             print ('do dialogue',faceid,text)
@@ -88,7 +92,6 @@ class RomanPhoto :
             if square :
                 pos = self.findBestPlace(square,self.faces[faceid],bull.size)
                 #self.draw.rectangle((square[0],square[1],square[0]+square[2],square[1] +square[3]))
-                border = 10
                 arrow = self.findArrow(self.faces[faceid],(pos[0],pos[1],bull.size[0],bull.size[1]))
                 self.draw.polygon(arrow,fill="white")
                 xb = pos[0] - border if pos[0] - border > 0 else 0
@@ -103,7 +106,8 @@ class RomanPhoto :
                     #self.draw.rectangle((xr,yr,xr2,arrow[2][1]))
 
                 self.im.paste(bull, pos)
-                rects = self.findRectangle(squ,pos[1]+20)
+                print ('*****************************Draw Bull',bull.size,pos)
+                rects = self.findRectangle(squ[:],pos[1]+20)
             else :
                 break
         return self.im
@@ -182,7 +186,7 @@ class RomanPhoto :
         lines.reverse()
         return  self.findDown(start,lenght,lines)
 
-    def findArrow(self,face,bull,border = 20,larger=20) :
+    def findArrow(self,face,bull,border = 20,larger=20) :        
         xf,yf,wf,hf = face
         xb,yb,wb,hb = bull
         xc = xf + wf/2
@@ -206,8 +210,17 @@ class RomanPhoto :
                 x1 = x0 + larger
             else :
                 #center
-                print('center')
-                x0 = xc - larger/2
+                print('center max',wf,xf-xb,xb+wb-xf-wf)
+                if max(wf,xf-xb,xb+wb-xf-wf) == xf-xb :
+                    #left center arrox
+                    x1 = xf - border
+                    x0 = x1 - larger
+                elif max(wf,xb+wb-xf-wf) == wf  :
+                    #center arrow
+                    x0 = xc - larger/2
+                else :
+                    x0 = xf + wf + border
+
                 x0 = xb + border if x0 - border < xb else x0
                 x0 = xb + wb - border -larger if x0 + larger + border > xb + wb else x0
                 x1 = x0 + larger
@@ -279,50 +292,33 @@ class RomanPhoto :
 
         if xf + wf <= xr :
             right = True
-
-        print xf,wf,xr
-
-        if left or right :
-            print('1left')
+        
+        if left or right :            
             y = yf - hb/2
-            y = y if y > yr else yr
-            y = yr
-            print ('y=',y,yf,yr)
-            #y = y if y + hb < yr + hr else yr + hr/2 - hb/2
+            y = max(y,yr)
+            y = y if y + hb <= yr + wr else yr + hr - hb            
             if left :
-                x = xr + wr - wb
-                #x = x if x > xr  and x + wb < xr + wr else  xr + wr/2 - wb/2
+                x = max(xf - wb - 20,xr)                
             else :
-                x = xr
-                #x = x if x > xr and x + wb < xr + wr else xr + wr/2 - wb/2
-        else :
-            print('1top')
-            if xf <= self.resolution[0]/2 :
-                print ('1left')
-                x = xf - wb/3
-                x= x if x > xr and x + wb < xr + wr else x + (xr - x)
-                print x,xr
-                x = x if x >= xr and x + wb <= xr + wr else xf
-                #x = x if x > xr and x + wb < xr + wr else xr + wr/2 - wb/2
-            else :
-                print('1righgggggggggggggggggggggg')
-                x = xf - wf/3
-                print x,xr
-                x = x if x >= xr and x + wb <= xr + wr else xr + wr - wb
-                x = x if x >= xr and x + wb <= xr + wr else xr + wr/2 - wb/2
-                #x = x if x > xr else xr + wr/2 - wb/2
+                x = max(xf + wf + 20,xr)                
+        else :            
+            if xf <= self.resolution[0]/2 :                                
+                x = xf -wb                
+                x = max(x,xr)
+                x = x if x + wb <= xr + wr else xr + wr - wb
 
+            else :                                
+                x = xf                
+                x = max(x,xr)
+                x = x if x + wb <= xr + wr else xr + wr - wb                
             if top :
-                y = yr + hr/3 - hb/2
-                print ('y = ',y,yr,hr,hb)
-                y = y if y + hb < yr + hr and y > yr else yr + hr/2 - hb/2
-                y = y if y > yr else yr
-
-                print ('y = ',y)
+                y = yr + hr/3 - hb/2 - 20                
+                y = max(y,yr)
+                y = y if y + hb <= yr + hr else yr
             else :
                 y = yr + hb/3
                 y = y if y + hb < yr + hr else yr + hr/2 - hb/2
-
+    
         return (x,y)
 
     def getSquareBubble(self,text,square,face,font,wr=7,hr=3) :

@@ -25,7 +25,7 @@ class _SlitScan(allframes):
         self.finished.wait()
         if self.nb_image == 0:
             return None
-        img = Image.new('L', self.resolution, 0)
+        img = Image.new('RGB', self.resolution, 0)
         slitsize = self.resolution[0] / self.nb_image
         reste_img = self.resolution[0] % self.nb_image
         keyframe = []
@@ -44,17 +44,17 @@ class _SlitScan(allframes):
                 if (i + 1) % k == 0:
                     frame += 1
             if frame != 0:
-                #column = Image.frombuffer('L', self.resolution, self.read(), "raw", 'L', 0, 1)
-                column = bytes_to_rgb(self.read(),self.resolution)               
-                column = Image.fromarray(frame)
+                column = Image.frombuffer('L', self.resolution, self.read(), "raw", 'L', 0, 1)
                 column = self.cropMethod(column, x, frame)
                 img.paste(column, (x, 0))
+                print ('got a image from array and paste it')
                 del(column)
                 x += frame
             else:
                 # throw unecessery frame
                 a = self.read()
                 del(a)
+        print ('ive returnend a slitscan image',img)
         return img    
 
 class ScanMode(_SlitScan):
@@ -82,8 +82,8 @@ class ScanModeLive(ScanModeFix):
         frame = self.read()
         if not frame:
             return
-        frame = bytes_to_rgb(frame,self.resolution)               
-        frame = Image.fromarray(frame)
+        #frame = bytes_to_rgb(frame,self.resolution)               
+        frame = Image.frombuffer('L', self.resolution, frame, "raw", 'L', 0, 1)
         return self.cropMethod(frame, 0, self.slitSize).rotate(90, expand=1)
 
 def SlitScan(resolution,mode=SCAN_MODE, slitscansize=1):

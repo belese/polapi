@@ -84,7 +84,8 @@ class Camera(Resource):
         return Image.open(stream)
     
     def startMode(self,iostream,format='rgb') :
-        self.camera.resolution = self.resolution                                 
+        print ('startmode self.resolution',self.resolution)
+        #self.camera.resolution = self.resolution                                 
         self.startRecording(iostream,format)        
 
     def registerEvent(self,cb,event) :
