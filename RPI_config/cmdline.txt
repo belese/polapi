@@ -1,0 +1,1 @@
+dwc_otg.lpm_enable=0 console=tty1 root=PARTUUID=19cc3cf8-02 rootfstype=ext4 elevator=deadline fsck.repair=yes g_ether.host_addr=72:8d:1f:c4:e8:ca g_ether.dev_addr=46:10:3a:b3:af:d9 rootwait
