@@ -114,14 +114,14 @@ class polapi :
 		self.timer = None				
 		
 		#register all buttons
-		self.declencheur = BUTTONS.register(DECLENCHEUR,self.takePhoto)
-		self.auto = BUTTONS.register(AUTO,self.onAuto)
-		self.lum = BUTTONS.register(LUM,self.onLuminosity)
-		self.bsize = BUTTONS.register(FORMAT,self.onFormat)
-		self.value0 = BUTTONS.register(VALUE0,self.onValue0)		
-		self.value1 = BUTTONS.register(VALUE1,self.onValue1)		
-		self.value2 = BUTTONS.register(VALUE2,self.onValue2)
-		self.value3 = BUTTONS.register(VALUE3,self.onValue3)				
+		self.declencheur = BUTTONS.register(GPIO,DECLENCHEUR,self.takePhoto)
+		self.auto = BUTTONS.register(MPR121,AUTO,None,self.onAuto)
+		self.lum = BUTTONS.register(MPR121,LUM,self.onLuminosity)
+		self.bsize = BUTTONS.register(MPR121,FORMAT,self.onFormat)
+		self.value0 = BUTTONS.register(MPR121,VALUE0,self.onValue0)		
+		self.value1 = BUTTONS.register(MPR121,VALUE1,self.onValue1)		
+		self.value2 = BUTTONS.register(MPR121,VALUE2,self.onValue2)
+		self.value3 = BUTTONS.register(MPR121,VALUE3,self.onValue3)				
 		self.mode = None
 		self.onValue(AUTO,STANDARD)
 		BUZZ.vibrator(BUZZ.READY)
@@ -141,7 +141,7 @@ class polapi :
 		else :
 			return histogramme(img)
 			
-	def onAuto(self) :		
+	def onAuto(self,delay) :
 		log ("Reset settings to auto")
 		BUZZ.vibrator(BUZZ.TOUCHED)
 		self.mode = None
