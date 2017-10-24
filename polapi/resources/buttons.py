@@ -104,8 +104,7 @@ class Mpr121 :
        time.sleep(0.1)
 	
 class Button :  
-    def __init__(self,pinid,onPress,onRelease) :
-        self.pinid = pinid
+    def __init__(self,onPress,onRelease) :
         self.state = True
         self.onPress = onPress
 	self.onRelease = onRelease
@@ -119,9 +118,6 @@ class Button :
 
     def status(self) :
         return self.state
-    
-    def getPinId(self) :
-        return self.pinid
 
     def _onPress(self) :
 	self.pressTime = time.time()
@@ -145,7 +141,7 @@ class Buttons :
 	     	self.gpio.register(btn)
 	     elif type == MPR121 :
 	     	self.mpr.register(btn)
-	self.buttons[type][btn].append(Button(btn,cbOnPress,cbOnRelease))	
+	self.buttons[type][btn].append(Button(cbOnPress,cbOnRelease))	
         return self.buttons[type][btn]
         
     def onPress(self,type,btn) :		
