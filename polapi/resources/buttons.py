@@ -101,7 +101,7 @@ class Mpr121 :
 			if self.onRelease :
                             self.onRelease(MPR121,i)            		
                 last_touched = current_touched
-            time.sleep(0.1)
+       time.sleep(0.1)
 	
 class Button :  
     def __init__(self,pinid,onPress,onRelease) :
