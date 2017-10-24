@@ -125,11 +125,11 @@ class Button :
 
     def _onPress(self) :
 	self.pressTime = time.time()
-	if self.onPress :
+	if self.onPress and self.state:
 	      self.onPress()
     
     def _onRelease) :
-	if self.onRelease :
+	if self.onRelease and self.state :
 	      self.onRelease(self.pressTime - time.time())
 		
 class Buttons : 
@@ -139,21 +139,24 @@ class Buttons :
         self.buttons = {MPR121:{},GPIO:{}}
                     
     def register(self,type,btn,cbOnPress,cbOnRelease):
-        self.buttons[type][btn] = Button(btn,cbOnPress,cbOnRelease)
-	if type == GPIO :
-	     self.gpio.register(btn)
-	elif type == MPR121 :
-	     self.mpr.register(btn)
-		
+        if not self.buttons[type].has_key(btn) :
+	     self.buttons[type][btn] = []
+	     if type == GPIO :
+	     	self.gpio.register(btn)
+	     elif type == MPR121 :
+	     	self.mpr.register(btn)
+	self.buttons[type][btn].append(Button(btn,cbOnPress,cbOnRelease))	
         return self.buttons[type][btn]
         
     def onPress(self,type,btn) :		
         if self.buttons[type].has_key(btn)
-           self.buttons[type][btn]._onPress()
+	   for btn in self.buttons[type][btn] :
+           	btn._onPress()
 
     def onRelease(self,type,btn) :		
         if self.buttons[type].has_key(btn)
-           self.buttons[type][btn]._onRelease()
+	    for btn in self.buttons[type][btn] :
+           	btn._onRelease()
     
 BUTTONS = Buttons()
 
