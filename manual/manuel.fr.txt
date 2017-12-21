@@ -1,5 +1,8 @@
 Mode sélection
 --------------
+D :
+appuis court : mode photo
+appuis long : mode slitscan
 
 A :
 appuis court : Mode automatique
