@@ -1,1 +1,41 @@
+Mode sélection
+--------------
+
+A :
+appuis court : Mode automatique
+appuis long  : Lock / Unlock
+
+L :
+appuis court : Mode luminosité
+   1 : Lumiere  très faible
+   2 : Lumière faible
+   3 : Lumière standard
+   4 : Lumière élevée
+
+appuis long : Mode effet
+   1 : gpen
+   2 : cartoon
+   3 : pastel
+   4 : oilpaint
+   
+F :
+appuis court : Mode format
+   1 : identité
+   2 : carré
+   3 : standard
+   4 : panoramique
+
+Fn spéciale
+
+1 : 
+appuis long :
+changement de mode slit scan
+1 buzz : slit scan fix
+2 buzz : slit scan live
+3 buzz : slit scan
+
+4 :
+appuis long :
+imprime ce mode d'emploi
+
 
