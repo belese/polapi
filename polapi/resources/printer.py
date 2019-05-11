@@ -17,6 +17,9 @@ class Printer(Resource):
         Resource.__init__(self)
         self.printer = ThermalPrinter("/dev/serial0", 9600, timeout=0, rtscts=True)
         self.printer.wake()
+        self.printer.setSize('S')
+        self.printer.setLineHeight(24)
+        self.printer.setCharset(4)
         self.lock = Lock()
 
     @queue_call
@@ -36,15 +39,13 @@ class Printer(Resource):
             height = int((float(im_height) * float(ratio)))
             image = image.resize((PRINTER_HEIGHT, height), Image.ANTIALIAS)
             self.printer.printImage(image, Laat)
-            self.printer.feed(3)
+            self.printer.feed(4)
             time.sleep(3)   
 
     @queue_call
     def print_txt(self, text):
-        with self.lock:
-            # self.printer.wake()
-            self.printer.println(text)
-            # self.printer.sleep()
+        with self.lock:                        
+            self.printer.printe(text)            
 
 
 PRINTER = Printer()

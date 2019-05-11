@@ -57,7 +57,7 @@ class Resource():
                 rc = fn(self, *arg, **kw)
             except Exception as e:
                 rc = None
-                print ('Unmangaed esxception',e)
+                print ('Unmanaged esxception',e)
                 raise
             self.onReturn(i, rc)
         print ('ressources thread stopped')

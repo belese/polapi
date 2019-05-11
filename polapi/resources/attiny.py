@@ -57,7 +57,7 @@ class Attiny85 :
 		data = self.getCommand(0x01)
 		if len(data) == 2 :
 			try :
-				vcc = (1024 * 1000) / ((data[1] << 8) | data[0])				
+				vcc = (1024 * 1070) / ((data[1] << 8) | data[0])				
 			except ZeroDivisionError:
 				return self.getVoltage()
 		return vcc

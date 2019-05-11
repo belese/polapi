@@ -55,8 +55,8 @@ VALUE2 = 1
 VALUE3 = 0
 
 #BATTERY OPTION
-BATLOW = 4000
-BATVERYLOW = 3900
+BATLOW = 4400
+BATVERYLOW = 4300
 BATCHARGE = 5300
 
 
@@ -78,6 +78,7 @@ OK = ((1, 0.2), (0, 0.1), (1, 0.2), (0, 0.1))
 READY = ((1, 0.3), (0, 0.3), (1, 0.3), (0, 0.3), (1, 0.3))
 CANCEL = ((1, 0.1), (0, 0.1))
 TOUCHED = ((1, 0.25), (0, 0.1))
+ERROR =((1,0.5),(0,0.1),(1,0.5),(0,0.1),(1,0.5),(0,0.1))
 def REPEAT(x): return ((1, 0.2), (0, 0.1)) * x
 
 
@@ -156,7 +157,9 @@ BTNVAL0 = BUTTONS.register(MPR121, VALUE0)
 BTNVAL1 = BUTTONS.register(MPR121, VALUE1)
 BTNVAL2 = BUTTONS.register(MPR121, VALUE2)
 BTNVAL3 = BUTTONS.register(MPR121, VALUE3)
-BTNSLITSCANMODE = BUTTONS.register(MPR121, VALUE0)
+BTNSLITSCANMODE = BUTTONS.register(MPR121, VALUE1)
+BTNPRINTMANUAL = BUTTONS.register(MPR121, VALUE2)
+BTNREPRINT = BUTTONS.register(MPR121, VALUE3)
 
 
 class mode:
@@ -167,12 +170,16 @@ class mode:
         return img
 
 
+
+import operator
+
+
 class luminosity(mode):
     def __init__(self):
         self.values = [LUMLOW, LUMMEDIUM, LUMMEDIUMHIGH, LUMHIGH, LUMDEFAULT]
         self.value = -1
         self.postvalue = ([1.5, 1.2], [1.2, 1.3], [
-                          1, 1.5], [0.8, 1.6], [1.2, 1.5])
+                          1, 1.5], [0.8, 1.6], [1, 1])
 
     def setMode(self, value):
         log("Select Luminosity %d" % value)
@@ -183,8 +190,11 @@ class luminosity(mode):
         log("Luminosity post process")
         # img.save('original.jpg')
         #img = Ying_2017_CAIP(img) 
-        img = ImageEnhance.Color(img)
-        
+        try :
+            img = self.equalize(img)
+        except :
+            pass
+        img = ImageEnhance.Color(img)        
         img = img.enhance(0)
         # img.save('bw.jpg')
         img = ImageEnhance.Brightness(img)
@@ -193,6 +203,20 @@ class luminosity(mode):
         img = ImageEnhance.Contrast(img)
         img = img.enhance(self.postvalue[self.value][1])
         return img
+
+    def equalize(self,im):
+        h = im.convert("L").histogram()
+        lut = []
+        for b in range(0, len(h), 256):
+            # step size
+            step = reduce(operator.add, h[b:b+256]) / 255
+            # create equalization lookup table
+            n = 0
+            for i in range(256):
+                lut.append(n / step)
+                n = n + h[i+b]
+        # map image through lookup table
+        return im.point(lut*im.layers)
 
 
 class size(mode):
@@ -283,7 +307,9 @@ class polapi:
         BTNSHUTTER.registerEvent(self.onPhoto, ONPRESSED)
         BTNSHUTTER.registerEvent(self.onSlitScan, ONPRESSED, 1)
         BTNSHUTTER.registerEvent(self.onStopSlitScan, ONRELEASED)
+        BTNFORCESTOP.disable()
         BTNFORCESTOP.registerEvent(self.onForceHalt, ONPRESSED, 2)
+        BTNFORCESTOP.registerEvent(self.wakeup, ONTOUCHED)
         BUZZ.buzz(READY)
 
         BTNAUTO.registerEvent(self.onAuto, ONPRESSED)
@@ -297,31 +323,49 @@ class polapi:
         BTNLUM.registerEvent(self.ontouched, ONTOUCHED)
         BTNSIZE.registerEvent(self.ontouched, ONTOUCHED)
 
-        BTNSLITSCANMODE.registerEvent(self.onSlitScanMode, ONPRESSED, 4)
+        BTNSLITSCANMODE.registerEvent(self.onSlitScanMode, ONPRESSED, 3)
         BTNSLITSCANMODE.registerEvent(self.ontouched, ONTOUCHED)
+
+        BTNPRINTMANUAL.registerEvent(self.onPrintManual, ONPRESSED, 3)
+        BTNPRINTMANUAL.registerEvent(self.ontouched, ONTOUCHED)
+        BTNREPRINT.registerEvent(self.reprint, ONPRESSED, 3)
+        BTNREPRINT.registerEvent(self.ontouched, ONTOUCHED)
 
         for i, btn in enumerate(self.buttons):
             btn.registerEvent(self.onValue, ONPRESSED, 0, i)
-            if btn != BTNVAL0:
+            if btn != BTNVAL1:
                 # BTNVAL0 already registere with BTNSLITSCANMODE
                 btn.registerEvent(self.ontouched, ONTOUCHED)
 
         CAMERA.register(self.onCameraEvent)
+        CAMERA.registerEvent(self.onQrCode,CAMERA.ONQRCODE)
         PRINTER.register(self.onPrinterEvent)
         POWER.registerEvent(self.onLowBattery,LOWER,BATLOW)
         POWER.registerEvent(self.onVeryLowBattey,LOWER,BATVERYLOW)
-        POWER.registerEvent(self.onCharge,HIGHER,BATCHARGE)
+        POWER.registerEvent(self.onCharge,HIGHER,BATCHARGE)        
 
+    
+    def onPrintManual(self) :
+        print ('Print manual')
+        BUZZ.buzz(OK)
+        with open('resources/manuel.fr.txt','r') as manual : 
+            for line in manual :
+                PRINTER.print_txt(line)        
+
+    def onQrCode(self,data) :
+        print ('qr code decoded',data)
+        
     def onLowBattery(self) :
-        pass
+        print ('Low Battery')
     
     def onVeryLowBattey(self) :
-        pass
+        print ('Very Low Battery')
     
     def onCharge(self) :
         pass
     
     def onForceHalt(self) :
+        print ('Forced Halt')
         self.halt()
     
     def onSlitScanMode(self):
@@ -339,25 +383,35 @@ class polapi:
             BUZZ.buzz(REPEAT(3))
 
     def wakeup(self) :
+        self.lastTouched = time.time()
         if self.sleeping :
+            print ('Disable force stop')
+            BTNSHUTTER.enable()
             BTNFORCESTOP.disable()
             CAMERA.wake()
-            self.sleeping = False
+            self.sleeping = False            
     
     def sleep(self) :
         if not self.sleeping :
+            BTNSHUTTER.disable()
+            print ('Enable force stop')
             BTNFORCESTOP.enable()
             CAMERA.sleep()
             self.sleeping = True
         
     def onShutterTouched(self):
         log("Shutter touched")        
-        self.lastTouched = time.time()        
+        #self.lastTouched = time.time()        
         self.picture = CAMERA.getPhoto()
         if self.slitscanmode == SCAN_MODE_LIVE:
             for mode in self.modes:
-                mode.setDefault()
+                mode.setMode(-1)
         self.slitscanobject = CAMERA.startSlitScan(self.slitscanmode)
+
+    def reprint(self) :        
+        if self.picture :
+            BUZZ.buzz(OK)
+            self.printPhoto(self.picture)        
 
     def onPhoto(self):
         log("Photo mode selected")
@@ -369,9 +423,14 @@ class polapi:
 
     def printPhoto(self, img):
         log("Print photo")
-        for mode in self.modes:
-            img = mode.postProcess(img)
-        self.printID = PRINTER.printToPage(img)
+        try :
+            for mode in self.modes:        
+                img = mode.postProcess(img)
+        except Exception as e :
+            print ('****************Exception',e)
+            BUZZ.buzz(ERROR)
+        else :
+            self.printID = PRINTER.printToPage(img)
 
     def onSlitScan(self):
         log('Slitscan mode selected')
@@ -383,9 +442,7 @@ class polapi:
     def onStopSlitScan(self):
         log('Shutter released')
         CAMERA.stopSlitScan()
-        self.sleep()
-        BTNSHUTTER.disable()
-        BTNFORCESTOP.enable()
+        self.sleep()                
         if self.slitscan and self.slitscanmode == SCAN_MODE_LIVE:
             for mode in self.modes:
                 mode.setMode(self.mode)
@@ -402,12 +459,11 @@ class polapi:
             self.imageReady.set()
 
     def onPrinterEvent(self, event, arg):
-        if event == PRINTER.RETURN and arg[0] == self.printID:
+        if event == PRINTER.RETURN and arg[0] == self.printID:            
             log("Print finished")
             BUZZ.buzz(OK)
-            self.wakeup()
-            BTNFORCESTOP.disable()
-            BTNSHUTTER.enable()
+            self.wakeup()            
+            
 
     def onAuto(self):
         if not self.lock:
@@ -431,11 +487,17 @@ class polapi:
             BTNLUM.enable()
             BTNSIZE.enable()
             BTNSLITSCANMODE.enable()
+            BTNSLITSCANMODE.enable()
+            BTNPRINTMANUAL.enable()
+            BTNREPRINT.enable()
         else:
             log("lock buttons")
             BTNLUM.disable()
             BTNSIZE.disable()
             BTNSLITSCANMODE.disable()
+            BTNSLITSCANMODE.disable()
+            BTNPRINTMANUAL.disable()
+            BTNREPRINT.disable()
             for button in self.buttons:
                 button.disable()
         self.lock = not self.lock
@@ -443,10 +505,12 @@ class polapi:
 
     def onModeSelect(self, mode):
         log("Enter in select mode")
+        if mode > 1 :
+            BUZZ.buzz(TOUCHED)
         self.cancelTimer()
         self.setTimer()
         self.lastMode = self.mode    
-        self.mode = mode
+        self.mode = mode        
         for button in self.buttons:
             button.enable()
 
@@ -508,6 +572,10 @@ class polapi:
 def signal_handler(signal, frame):
     print('You pressed Ctrl+C!')
 
+#CAM = polapi()
+
+
+#"""
 try:
     CAM = polapi()
     signal.signal(signal.SIGINT, signal_handler)
@@ -517,6 +585,7 @@ except :
     raise
 finally :
     CAM.stop()
+#"""
 
 '''
 try:

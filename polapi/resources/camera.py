@@ -28,6 +28,11 @@ import Queue
 import picamera
 from lz4 import compress, decompress, compress_fast
 import psutil
+import cv2
+from pyzbar import pyzbar
+import imutils
+import numpy
+
 
 from PIL import Image
 
@@ -147,20 +152,31 @@ class ScanModeLive(ScanModeFix):
         return self.cropMethod(frame, 0, self.slitSize).rotate(90, expand=1)
 
 
+
 class Camera(Resource):
+
+    ONQRCODE = 20
+
     def __init__(self):
         Resource.__init__(self)
         self.camera = None
-        self.initCamera()
         self.camlock = threading.Lock()
+        self.camfree = threading.Lock()
+        self.camfree.acquire()
+        self.initCamera()
         self.img = None
         self.keepres = None
         self.resolution =  SLITSCAN_SIZE
+        self.events = {self.ONQRCODE : []}
+        self.stopped = False
+        self.thread = threading.Thread(target=self._startQrCodeScanner)
+        self.thread.start()
 
     @queue_call
     def setSettings(self, settings):
         for param in settings.keys():
-            setattr(self.camera, param, settings[param])
+            with self.camlock :
+                setattr(self.camera, param, settings[param])
         self.resolution = self.camera.resolution 
 
     @queue_call
@@ -170,15 +186,20 @@ class Camera(Resource):
             self.camera = picamera.PiCamera()
             self.camera.framerate = 90
             self.camera.resolution = self.resolution 
+            self.camfree.release()
             #self.camera.vflip = True
 
     @queue_call
     def getPhoto(self):
+        return self._getPhoto()
+    
+    def _getPhoto(self) :
         stream = io.BytesIO()
         with self.camlock:
             self.camera.capture(stream, format='jpeg')
         stream.seek(0)
         return Image.open(stream)
+    
 
     
     def startSlitScan(self, mode=SCAN_MODE, slitscansize=1):
@@ -192,9 +213,32 @@ class Camera(Resource):
         self.startRecording(slitScanProcess, self.resolution)
         return slitScanProcess
 
+    def onQrCode(self, data):
+        print 'onQrCOde',data
+        self.qrcodescanning = False
+        for event in self.events[self.ONQRCODE] :
+            print ('Call cb')
+            event(data)
+         
+    def _startQrCodeScanner(self) :        
+        while not self.stopped :
+            with self.camfree :
+                frame =self._getPhoto()
+            barcodes = pyzbar.decode(frame)            
+            # loop over the detected barcodes            
+            for barcode in barcodes:                
+                barcodeData = barcode.data.decode("utf-8")                                
+                if barcodeData :                    
+                    self.onQrCode(barcodeData)
+
+    def registerEvent(self,cb,event) :
+        self.events[event].append(cb)
+
+    
     @queue_call
     def startRecording(self, stream, res):
         print ('start recoreding, acquire lock')
+        self.camfree.acquire()
         self.camlock.acquire()
         self.camera.start_recording(stream, format='yuv', resize=res)
 
@@ -214,12 +258,14 @@ class Camera(Resource):
         finally :
             print ('stop recoreding, release lock')
             self.camlock.release()
+            self.camfree.release()
 
     def stopSlitScan(self):
         self.stopRecording()
 
     @queue_call
     def stop(self):
+        self.stopped = True
         if self.camera.recording:
             self.stopSlitScan()
         with self.camlock:
@@ -228,17 +274,18 @@ class Camera(Resource):
 
     @queue_call
     def sleep(self):        
+        self.camfree.acquire()
         with self.camlock:
             print ('Pause camera')
             self.camera.close()
+        
 
     
     def wake(self):        
-        self.initCamera()
+        self.initCamera()        
 
 
 CAMERA = Camera()
-
 
 def main(args):
     try:
