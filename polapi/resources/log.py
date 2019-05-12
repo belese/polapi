@@ -36,12 +36,9 @@ class log:
 
     def log(self, *args, **kwarg):
         for msg in args:
-            print(msg)
-        if 'level' not in kwarg:
-            level = self.INFO
-        else:
-            level == kwarg['level']
-        if level > self.level:
+            print(msg)        
+        level = kwarg.get('level',self.INFO)
+        if level >= self.level:
             for msg in args:
                 PRINTER.print_txt(msg)
 

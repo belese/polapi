@@ -26,10 +26,9 @@ import io
 import threading
 import Queue
 import picamera
-from lz4 import compress, decompress, compress_fast
-import psutil
+
 import cv2
-from pyzbar import pyzbar
+
 import imutils
 import numpy
 
@@ -38,252 +37,102 @@ from PIL import Image
 
 from resources.resource import Resource, queue_call
 
-SLITSCAN_WIDTH = 640
-SLITSCAN_HEIGHT = 384
-SLITSCAN_SIZE = (SLITSCAN_WIDTH, SLITSCAN_HEIGHT)
-
-NO_SCAN = 1
-SCAN_MODE = 2
-SCAN_MODE_FIX = 3
-SCAN_MODE_LIVE = 4
-
-SLIT_SCAN_FIX_WIDTH = 1
-
-LOW_MEMORY = 50 * 1024 * 1024
-
-
-class SlitScan(object):
-    def __init__(self, resolution=SLITSCAN_SIZE):
-        self.resolution = resolution
-        self.queue = Queue.Queue()
-        self.nb_image = 0
-        self.finished = threading.Event()
-
-    def _put(self, objet):
-        if psutil.virtual_memory()[1] > LOW_MEMORY:
-            self.queue.put(compress_fast(objet, 3))
-            return True
-        else:
-            return False
-
-    def _get(self):
-        rc = self.queue.get()
-        self.queue.task_done()
-        return decompress(rc)
-
-    def write(self, s):
-        if not self._put(s):
-            self.write = self._throw
-            return
-        self.nb_image += 1
-
-    def _throw(self, s):
-        pass
-
-    def getImage(self):
-        self.finished.wait()
-        if self.nb_image == 0:
-            return None
-        img = Image.new('L', self.resolution, 0)
-        slitsize = self.resolution[0] / self.nb_image
-        reste_img = self.resolution[0] % self.nb_image
-        keyframe = []
-
-        while reste_img > 0:
-            val = (self.nb_image / reste_img)
-            if self.nb_image % reste_img != 0:
-                val += 1
-            keyframe.append(val)
-            reste_img = reste_img - (self.nb_image / val)
-
-        x = 0
-        for i in range(self.nb_image):
-            frame = slitsize
-            for k in keyframe:
-                if (i + 1) % k == 0:
-                    frame += 1
-            if frame != 0:
-                column = Image.frombuffer(
-                    'L', self.resolution, self._get(), "raw", 'L', 0, 1)
-                column = self.cropMethod(column, x, frame)
-                img.paste(column, (x, 0))
-                del(column)
-                x += frame
-            else:
-                # throw unecessery frame
-                a = self._get()
-                del(a)
-        return img
-
-    def flush(self):
-        self.finished.set()
-
-
-class ScanMode(SlitScan):
-    def cropMethod(self, img, x, frame):
-        return img.crop((x, 0, x + frame, img.size[1]))
-
-
-class ScanModeFix(SlitScan):
-    def cropMethod(self, img, x, frame):
-        return img.crop(((img.size[0] / 2) - frame / 2,
-                         0,
-                         (img.size[0] / 2) + (frame - (frame / 2)),
-                         img.size[1]))
-
-
-class ScanModeLive(ScanModeFix):
-    def __init__(self, resolution=SLITSCAN_SIZE, slitSize=1):
-        ScanModeFix.__init__(self, resolution)
-        self.slitSize = slitSize
-
-    def getImage(self):
-        return None
-
-    def flush(self):
-        self._put("")
-        ScanModeFix.flush(self)
-
-    def get(self):
-        frame = self._get()
-        if not frame:
-            return None
-        frame = Image.frombuffer('L', self.resolution, frame, "raw", 'L', 0, 1)
-        return self.cropMethod(frame, 0, self.slitSize).rotate(90, expand=1)
-
-
 
 class Camera(Resource):
 
-    ONQRCODE = 20
-
-    def __init__(self):
+    def __init__(self,resolution=(640,384)):
         Resource.__init__(self)
         self.camera = None
         self.camlock = threading.Lock()
-        self.camfree = threading.Lock()
-        self.camfree.acquire()
         self.initCamera()
         self.img = None
         self.keepres = None
-        self.resolution =  SLITSCAN_SIZE
-        self.events = {self.ONQRCODE : []}
+        self.resolution =  resolution
         self.stopped = False
-        self.thread = threading.Thread(target=self._startQrCodeScanner)
-        self.thread.start()
+        self.mode = None
+        self._mode = self.mode
+        self._args = []
+        self._kwargs = {}
+        self.framerate = 90
 
     @queue_call
     def setSettings(self, settings):
-        for param in settings.keys():
-            with self.camlock :
-                setattr(self.camera, param, settings[param])
+        for param in settings.keys():            
+            setattr(self.camera, param, settings[param])
         self.resolution = self.camera.resolution 
 
     @queue_call
     def initCamera(self):
         print ('Start camera')
-        with self.camlock :
-            self.camera = picamera.PiCamera()
-            self.camera.framerate = 90
-            self.camera.resolution = self.resolution 
-            self.camfree.release()
+        #with self.camlock :
+        self.camera = picamera.PiCamera()
+        self.camera.framerate = self.framerate
+        self.camera.resolution = self.resolution 
             #self.camera.vflip = True
 
     @queue_call
-    def getPhoto(self):
-        return self._getPhoto()
+    def getPhoto(self,onPhoto):
+        print ('getPhoto')
+        photo = self._getPhoto()
+        onPhoto(photo)
+        return photo
     
-    def _getPhoto(self) :
-        stream = io.BytesIO()
-        with self.camlock:
-            self.camera.capture(stream, format='jpeg')
+    def _getPhoto(self) :        
+        stream = io.BytesIO()        
+        self.camera.capture(stream, format='jpeg')
         stream.seek(0)
         return Image.open(stream)
     
-
-    
-    def startSlitScan(self, mode=SCAN_MODE, slitscansize=1):
-        if mode == SCAN_MODE:
-            slitScanProcess = ScanMode(self.resolution)
-        elif mode == SCAN_MODE_FIX:
-            slitScanProcess = ScanModeFix(self.resolution)
-        elif mode == SCAN_MODE_LIVE:
-            slitScanProcess = ScanModeLive(
-                self.resolution, slitscansize)
-        self.startRecording(slitScanProcess, self.resolution)
-        return slitScanProcess
-
-    def onQrCode(self, data):
-        print 'onQrCOde',data
-        self.qrcodescanning = False
-        for event in self.events[self.ONQRCODE] :
-            print ('Call cb')
-            event(data)
-         
-    def _startQrCodeScanner(self) :        
-        while not self.stopped :
-            with self.camfree :
-                frame =self._getPhoto()
-            barcodes = pyzbar.decode(frame)            
-            # loop over the detected barcodes            
-            for barcode in barcodes:                
-                barcodeData = barcode.data.decode("utf-8")                                
-                if barcodeData :                    
-                    self.onQrCode(barcodeData)
+    def startMode(self,iostream) :                                
+        self.startRecording(iostream)        
 
     def registerEvent(self,cb,event) :
         self.events[event].append(cb)
 
     
     @queue_call
-    def startRecording(self, stream, res):
+    def startRecording(self, iostream):
         print ('start recoreding, acquire lock')
-        self.camfree.acquire()
-        self.camlock.acquire()
-        self.camera.start_recording(stream, format='yuv', resize=res)
+        #self.camlock.acquire()        
+        print ('start recoreding, lock acquire')
+        self.camera.framerate = self.framerate
+        self.camera.start_recording(iostream, format='yuv', resize=self.resolution)
+        print ('Leave startrecording')
 
     @queue_call
-    def stopRecording(self):
-        #if not self.camera :
-        #    self.camlock.release()
-        #    return    
+    def stopRecording(self):         
         print ('in stop recording')
         try :
-            self.camera.stop_recording()
-            #if self.keepres:
-            #    self.camera.resolution = self.keepres
-            #    self.keepres = None
+            self.camera.stop_recording()            
         except :
             raise
         finally :
-            print ('stop recoreding, release lock')
-            self.camlock.release()
-            self.camfree.release()
+            print ('stop recording, release lock')            
+            #self.camlock.release()
+            
 
-    def stopSlitScan(self):
-        self.stopRecording()
+    def stopMode(self):
+        print ('STOP MODE')
+        #if self.mode :
+        self.stopRecording()            
 
     @queue_call
     def stop(self):
         self.stopped = True
         if self.camera.recording:
             self.stopSlitScan()
-        with self.camlock:
-            self.camera.close()
+        #with self.camlock:
+        self.camera.close()
         Resource.stop(self)
 
     @queue_call
     def sleep(self):        
-        self.camfree.acquire()
-        with self.camlock:
-            print ('Pause camera')
-            self.camera.close()
+        #with self.camlock:
+        print ('Pause camera')
+        self.camera.close()
         
-
-    
     def wake(self):        
         self.initCamera()        
-
 
 CAMERA = Camera()
 

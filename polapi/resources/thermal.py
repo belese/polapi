@@ -296,7 +296,6 @@ class ThermalPrinter(Serial):
         data = streamer.get()
         total_raw = 0
         while data:
-            sleeptime = 0.0
             nb_row = streamer.nb_image - total_raw
             if nb_row > 255:
                 nb_row = 255
@@ -304,17 +303,9 @@ class ThermalPrinter(Serial):
             for i in range(nb_row):
                 start = time.time()
                 bmp = self.toBitmap(data)
-                blackdotbit = 0
                 for j in range(48):
-                    super(ThermalPrinter, self).write(chr(bmp[j]))
-                    blackdotbit += bin(bmp[j])[2:].count('1')
-                data = streamer.get()
-
-                sleep = ((float(blackdotbit) / 48)**3) * 1700
-                sleeptime += sleep / 10000000
-                if sleeptime > 0.5:
-                    #time.sleep(sleeptime - (time.time() - start))
-                    sleeptime = 0
+                    super(ThermalPrinter, self).write(chr(bmp[j]))                
+                data = streamer.get()                
             total_raw += nb_row
 
     def printBitmap(self, w, h, bitmap, LaaT=False):        

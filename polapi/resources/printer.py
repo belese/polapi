@@ -23,29 +23,35 @@ class Printer(Resource):
         self.lock = Lock()
 
     @queue_call
-    def streamImages(self, streamer):
+    def streamImages(self, streamer,onFinished=None):
         with self.lock:
             # self.printer.wake()
             self.printer.streamImage(streamer)
             self.printer.feed(3)
             # self.printer.sleep()
+            if onFinished :
+                onFinished()
 
     @queue_call
-    def printToPage(self, image, Laat=False):
+    def printToPage(self, image, onFinished=None):
         with self.lock:
             print ('Printing...')           
             im_width, im_height = image.size
             ratio = (PRINTER_HEIGHT / float(im_width))
             height = int((float(im_height) * float(ratio)))
             image = image.resize((PRINTER_HEIGHT, height), Image.ANTIALIAS)
-            self.printer.printImage(image, Laat)
+            self.printer.printImage(image)
             self.printer.feed(4)
-            time.sleep(3)   
+            if onFinished :
+                onFinished()
+               
 
     @queue_call
-    def print_txt(self, text):
+    def print_txt(self, text,onFinished=None):
         with self.lock:                        
-            self.printer.printe(text)            
+            self.printer.printe(text)  
+        if onFinished :
+            onFinished()
 
 
 PRINTER = Printer()

@@ -54,12 +54,15 @@ class Resource():
         while not self.terminated:
             i, fn, arg, kw = self.queue.get()
             try :
+                print ('run ',fn.__name__)
                 rc = fn(self, *arg, **kw)
+                print ('end run ',fn.__name__)
             except Exception as e:
                 rc = None
                 print ('Unmanaged esxception',e)
                 raise
-            self.onReturn(i, rc)
+            finally :
+                self.onReturn(i, rc)
         print ('ressources thread stopped')
 
     def stop(self):
