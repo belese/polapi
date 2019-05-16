@@ -2,6 +2,7 @@ import threading
 import time
 
 from resources.camera import CAMERA
+from resources.printer import PRINTER
 from resources.buttons import ATTINY, BUTTONS, ONTOUCHED, ONPRESSED, ONRELEASED
 from resources.vibrator import BUZZ,OK,READY,CANCEL,TOUCHED,ERROR,REPEAT
 from resources.wiring import DECLENCHEUR,AUTO,LUM,VALUE0,VALUE1,VALUE2,VALUE3
@@ -61,8 +62,16 @@ class RomanPhoto(mode) :
         print ('find faces',img,faces)
         if len(faces) >= 1 and self.enabled :
             self.disable()
+            BUZZ.buzz(OK)
             #self.cancel('qrcode')
-            bull = rp(img,CAMERA.resolution,faces.tolist(),self.dialogue)
+            try :
+                for mode in self.modes:        
+                    img = mode.postProcess(img)
+            except Exception as e :
+                log('Exception',str(e),level=30)
+                BUZZ.buzz(ERROR)
+                raise
+            bull = rp(img,CAMERA.resolution,faces,self.dialogue)
             imgbull = bull.getBubbles()
             imgbull.save('roman.jpeg', "JPEG")
             #img.save('romanimage.jpeg', "JPEG")
@@ -72,8 +81,9 @@ class RomanPhoto(mode) :
             self.printPhoto(imgbull)
             
 
-
-
+    def printPhoto(self, img):
+        log("Print photo") 
+        PRINTER.printToPage(img,self.onprintfinished)
         
     def onprintfinished(self):                    
         BUZZ.buzz(OK)        
