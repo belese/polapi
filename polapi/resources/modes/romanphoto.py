@@ -27,6 +27,7 @@ class Romanphoto(mode):
         self.canceled = True
 
     def setMode(self, value=-1):
+        print ('Set roman phot mode')
         try :
             self.dialogue = Dialogues(value)
             self.value = 1
@@ -36,7 +37,7 @@ class Romanphoto(mode):
     def postProcess(self, img,level=0) :                
         if self.value == 1 :
             if level == 0 :
-                img.rotate(180, expand=1)
+                img = img.rotate(180, expand=1)
                 self.canceled = False
                 self.btnshutter.enable()
                 BUZZ.buzz(TOUCHED)
@@ -47,14 +48,14 @@ class Romanphoto(mode):
                     if self.canceled :                  
                         return None
                     BUZZ.buzz(TOUCHED)
-                    img = next(CAMERA.sequence)
-                    img.rotate(180, expand=1)
+                    img = next(CAMERA.sequence).rotate(180, expand=1)                    
                     self.faces = face(img)                
                 self.btnshutter.disable()
                 BUZZ.buzz(OK)
             elif level == 1 :
                 romanphoto = RomanPhoto(img,img.size,self.faces,self.dialogue)
-                img = romanphoto.getBubbles()                
-                self.value == -1
+                img = romanphoto.getBubbles()
+                img = img.rotate(180, expand=1)                                
+                self.value = -1
                 self.disable()
         return img

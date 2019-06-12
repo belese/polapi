@@ -66,7 +66,7 @@ class ThermalPrinter(Serial):
         self.setPrintSettings()
         self.setPrintDensity()
 
-    def setPrintSettings(self, heatdot=5, heattime=120, heatinterval=250):
+    def setPrintSettings(self, heatdot=5, heattime=180, heatinterval=200): #heatime=120
         self.writeBytes(
             27,       # Esc
             55,       # 7 (print settings)

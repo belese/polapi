@@ -39,36 +39,3 @@ class allframes(object) :
     def stop(self) :
         self.stopped = True
 
-class lastframe(object) :
-    def __init__(self,resolution) :
-        self._frame = None
-        self.ready = threading.Event()
-        self.ready.clear()
-        self.finished = threading.Event()
-        self.resolution = resolution
-        self.stopped = False        
-    
-    def _run(self) :    
-        CAMERA.getPhoto(self.write)        
-        
-    def write(self,frame) :
-        self._frame = frame
-        self.ready.set()
-    
-    def read(self) :
-        #self._run()
-        self.ready.wait()
-        frame = self._frame        
-        self.ready.clear()        
-        return frame
-
-    def flush(self) :
-        self.finished.set()
-        self._frame = None
-        self.ready.clear()
-    
-    def stop(self) :
-        self.stopped = True
-        self._frame = None
-        self.ready.set()
-

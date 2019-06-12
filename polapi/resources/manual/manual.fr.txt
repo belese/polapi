@@ -1,4 +1,4 @@
-Mode sélection
+Mode selection
 --------------
 D :
 appuis court : mode photo
@@ -7,6 +7,7 @@ appuis 1.5 sec : mode slitscan
 A :
 appuis court : Mode automatique
 appuis 3 sec  : Lock / Unlock
+appuis 6 sec : Extinction
 
 L :
 appuis court : Mode luminosité
@@ -15,7 +16,7 @@ appuis court : Mode luminosité
    3 : Lumière standard
    4 : Lumière élevée
 
-appuis 2 sec : Mode effet
+appuis long : Mode effet
    1 : gpen
    2 : cartoon
    3 : pastel
@@ -28,23 +29,20 @@ appuis court : Mode format
    3 : standard
    4 : panoramique
 
+appuis long : Mode slitscan
+   2 : slit scan
+   3 : slit scan fix
+   4 : slit scan live
+   
 Fn spéciale
 
-2 : 
-appuis 4 sec :
-changement de mode slit scan
-1 buzz : slit scan fix
-2 buzz : slit scan live
-3 buzz : slit scan
+4 : 
+appuis 2 sec :
+  Reimprime la derniere photo
 
 3 :
 appuis 4 sec :
 imprimer ce mode d'emploi
-
-4 :
-appuis 4 sec :
-réimprimer la dernière photo
-
 
 
 

@@ -32,7 +32,6 @@ from resources.printer import PRINTER
 from resources.buttons import GPIO, MPR121, ATTINY, BUTTONS, ONTOUCHED, ONPRESSED, ONRELEASED
 from resources.vibrator import BUZZ,OK,READY,CANCEL,TOUCHED,ERROR,REPEAT
 from resources.power import POWER,LOWER,HIGHER
-from resources.cammode.qrcode import QrCode
 from resources.wiring import DECLENCHEUR,AUTO,LUM,VALUE0,VALUE1,VALUE2,VALUE3,FORMAT
 from resources.modes import Enhancer
 
@@ -56,7 +55,7 @@ AUTOOFF = 600
 
 import operator
 
-class power(object) :
+class Power(object) :
     #POWER.registerEvent(self.onLowBattery,LOWER,BATLOW)
     #POWER.registerEvent(self.onVeryLowBattey,LOWER,BATVERYLOW)
     #POWER.registerEvent(self.onCharge,HIGHER,BATCHARGE)        
@@ -65,6 +64,25 @@ class power(object) :
         self.stopped = False
         self.lastTouched = time.time()
         threading.Thread(target=self.autostop).start()
+        self.btnauto = BUTTONS.register(MPR121, AUTO)
+        self.btnlum = BUTTONS.register(MPR121, LUM)
+        self.btnsize = BUTTONS.register(MPR121, FORMAT)
+        self.btnval0 = BUTTONS.register(MPR121, VALUE0)
+        self.btnval1 = BUTTONS.register(MPR121, VALUE1)
+        self.btnval2 = BUTTONS.register(MPR121, VALUE2)
+        self.btnval3 = BUTTONS.register(MPR121, VALUE3)
+        self.btnshutter = BUTTONS.register(ATTINY)
+        
+
+        self.btnauto.registerEvent(self.ontouched,ONTOUCHED)
+        self.btnauto.registerEvent(self.onForceHalt,ONPRESSED,6)
+        self.btnlum.registerEvent(self.ontouched,ONTOUCHED)
+        self.btnsize.registerEvent(self.ontouched,ONTOUCHED)
+        self.btnval0.registerEvent(self.ontouched,ONTOUCHED)
+        self.btnval1.registerEvent(self.ontouched,ONTOUCHED)
+        self.btnval2.registerEvent(self.ontouched,ONTOUCHED)
+        self.btnval3.registerEvent(self.ontouched,ONTOUCHED)
+        self.btnshutter.registerEvent(self.ontouched,ONTOUCHED)
     
     def ontouched(self) :    
         self.lastTouched = time.time()
@@ -76,20 +94,21 @@ class power(object) :
             time.sleep(10)
     
     def onForceHalt(self) :
+        BUZZ.buzz(OK)
         print ('Forced Halt')
         self.halt()
 
-    def halt(self) :
-        try :
-            self.stop()
-        except :
-            raise
-        finally :
-            os.system("shutdown now -h")
+    def halt(self) :  
+        self.stop()
+        os.system("shutdown now -h")
+
+    def stop(self) :
+        self.stopped = True      
 
 class polapi:
     def __init__(self):
         log('Enter in Polapi Main Application')
+        self.power = Power()
         self.btnauto = BUTTONS.register(MPR121, AUTO)
         self.btnlum = BUTTONS.register(MPR121, LUM)
         self.btnsize = BUTTONS.register(MPR121, FORMAT)
@@ -97,12 +116,16 @@ class polapi:
         self.btnval1 = BUTTONS.register(MPR121, VALUE1)
         self.btnval2 = BUTTONS.register(MPR121, VALUE2)
         self.btnval3 = BUTTONS.register(MPR121, VALUE3)
-        
-        
+                
         
         self.btnprintmanual = BUTTONS.register(MPR121, VALUE2)
         self.btnreprint = BUTTONS.register(MPR121, VALUE3)
         self.btnshutter = BUTTONS.register(ATTINY)
+        
+        self.stopchineseprint = BUTTONS.register(ATTINY)
+        self.stopchineseprint.disable()
+        
+
 
         self.btnauto.registerEvent(self.onAuto, ONPRESSED)
         self.btnauto.registerEvent(self.onlock, ONPRESSED, 3)
@@ -125,6 +148,8 @@ class polapi:
         self.btnshutter.registerEvent(self.onShutterTouched, ONTOUCHED)
         self.btnshutter.registerEvent(self.onPhoto, ONRELEASED)
 
+        self.stopchineseprint.registerEvent(self.power.onForceHalt,ONPRESSED,2)
+
         self.buttons = [self.btnval0, self.btnval1, self.btnval2, self.btnval3]
         for button in self.buttons:
             button.disable()        
@@ -132,6 +157,7 @@ class polapi:
         for i,btn in enumerate(self.buttons) :
             btn.registerEvent(self.onValue, ONPRESSED, 0, i)
             #btn.registerEvent(self.onbuzz, ONTOUCHED)
+
                        
         
         QRCODE.registerEvent(self.onRomanPhoto,'r')
@@ -149,6 +175,7 @@ class polapi:
         self.lock = False
         
         self._lastphoto = None
+        self._lastqrdata = None
 
         threading.Thread(target=self.timeout).start()
         threading.Thread(target=self.printPhoto).start()
@@ -177,12 +204,13 @@ class polapi:
         while not self.stopped:                                                          
             img = self.enhancer.postProcess(self.picture)        
             if img is not None:            
-                self.enhancer.disable()            
+                self.enhancer.disable()
+                self.stopchineseprint.enable()            
                 PRINTER.printToPage(img,self.onprintfinished)
             else :            
                 print ('******************img = None, enable btn shutter')
-                QRCODE.enable()
                 time.sleep(1)
+                QRCODE.enable()                
                 self.btnshutter.enable()                
             self.imageReady.clear()
             self.imageReady.wait()
@@ -201,16 +229,17 @@ class polapi:
         self.enhancer.modes['Slitscan'].disable()
         self.enhancer.modes['Romanphoto'].enable()
         self.enhancer.modes['Romanphoto'].setMode(data)
-    
+        
     def onImageReady(self, picture):  
-        print ('Image ready')
-        self.imageReady.set()                
+        print ('Image ready')                       
         self.picture = picture
+        self.imageReady.set() 
     
     def onprintfinished(self):                    
         self.enhancer.enable()        
         self.enhancer.modes['Slitscan'].enable()
         QRCODE.enable()
+        self.stopchineseprint.disable()
         self.btnshutter.enable()
         BUZZ.buzz(OK)
 
@@ -273,8 +302,7 @@ class polapi:
             for button in self.buttons:
                    button.disable()
             self.btnprintmanual.enable()
-            self.btnreprint.enable()
-             
+            self.btnreprint.enable()             
             self.timer.clear()
             self.timeoutset.clear()
 
@@ -292,6 +320,7 @@ class polapi:
         self.imageReady.set()
         self.cancelTimer()
         self.enhancer.disable()
+        self.power.stop()
         CAMERA.stop()
         BUTTONS.stop()
         PRINTER.stop()

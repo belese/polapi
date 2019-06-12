@@ -20,7 +20,7 @@ class Slitscan(mode):
     ORDER = 0
 
     def __init__(self) :
-        self.values = [SCAN_MODE, SCAN_MODE_FIX, SCAN_MODE_LIVE,SCAN_MODE_FIX]
+        self.values = [SCAN_MODE,SCAN_MODE, SCAN_MODE_FIX, SCAN_MODE_LIVE,SCAN_MODE_FIX]
         self.value = -1
         self.fps = CAMERA.framerate
         self.slitscanio = None
@@ -30,7 +30,8 @@ class Slitscan(mode):
         self.btnshutter.registerEvent(self.onStopSlitScan, ONRELEASED)
         self.slitscanobj = None
         self.slitscan = False
-        self.image = None                
+        self.image = None    
+        self.lock = threading.Event()            
 
     def enable(self) :
         mode.enable(self)
@@ -52,6 +53,7 @@ class Slitscan(mode):
         self.value = value if value else self.value    
 
     def postProcess(self,img,level=0) :
+        self.lock.wait()
         if self.slitscan and level == 0 :
             if self.slitscan :
                 if self.slitScanIO == ScanModeLive :
@@ -63,7 +65,8 @@ class Slitscan(mode):
                 self.slitscanobj = None    
         return img            
 
-    def onShutterTouched(self):          
+    def onShutterTouched(self):
+        self.lock.clear()          
         self.slitscanobj = self.slitScanIO(CAMERA.resolution)
         CAMERA.startMode(self.slitscanobj,format='yuv')        
         
@@ -76,6 +79,7 @@ class Slitscan(mode):
     
     def onStopSlitScan(self):
         log('Shutter released')        
-        CAMERA.stopMode()                
+        CAMERA.stopMode()    
+        self.lock.set()            
         
         

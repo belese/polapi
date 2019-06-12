@@ -21,12 +21,10 @@ class QRCode(Resource) :
         print 'start QRcode'
         time.sleep(5)
         for img in CAMERA.sequence :
-            print ('Got image')
             if self.terminated:
                 break
             self.enabled.wait()
             datas = pyzbar.decode(img)
-            print ('check qrcode',datas)
             if datas :
                 BUZZ.buzz(OK)
             for data in datas :

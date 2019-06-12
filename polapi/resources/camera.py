@@ -77,17 +77,14 @@ class Camera(Resource):
 
     @queue_call
     def getPhoto(self,onPhoto,*args,**kwargs):
-        print ('getPhoto')
         photo = self._getPhoto(*args,**kwargs)
         onPhoto(photo)
         return photo
     
     def _getPhoto(self,format='jpeg',*args,**kwargs) :   
-        print ('_getPhoto')     
         stream = io.BytesIO()        
         self.camera.capture(stream, format=format)
         stream.seek(0)
-        print ('_getPhoto return')     
         return Image.open(stream)
     
     def startMode(self,iostream,format='rgb') :
@@ -126,9 +123,7 @@ class Camera(Resource):
         while not self.stopped :
             self.frameready.clear()
             self.getPhoto(self.onFrame)
-            print ('wait photo ready')
             self.frameready.wait()
-            print ('yield frame')
             yield self.frame        
         
     def onFrame(self,img) :

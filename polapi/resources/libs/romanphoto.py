@@ -191,11 +191,18 @@ class RomanPhoto :
         xc = xf + wf/2
         yc = yf + hf/2
 
+        larger = larger if larger < wb else wb
+        border = border if larger + 2* border < wb else (wb - larger) / 2
+
         print ('find arrow position',yb,hb,yf)
 
         #todo check with x instead
         if yb + hb < yf + 20 or yb > yf + hf - 20 :
             print ('arrow top or bottom')
+            
+            larger = larger if larger < wb else wb
+            border = border if larger + 2* border < wb else (wb - larger) / 2
+            
             #top or bottom
             if xb + wb < xf :
                 #left
@@ -247,6 +254,10 @@ class RomanPhoto :
 
         else :
             #right or left
+            
+            larger = larger if larger < hb else hb
+            border = border if larger + 2* border < hb else (hb - larger) / 2
+            
             yc= yf + 2*hf/3
             y0 = yc - larger/2
             y0 = yb + border if y0 < yb +border else y0
