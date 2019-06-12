@@ -59,7 +59,7 @@ class ThermalPrinter(Serial):
     writeToStdout = False
 
     def __init__(self, port, baudrate=9600,*args,**kwargs):
-        os.system("../rpirtscts.sh")
+        os.system("/home/pi/polapi2/rpirtscts.sh")
         Serial.__init__(self, port, baudrate,*args,**kwargs)
         #self.wake()
         self.reset()
