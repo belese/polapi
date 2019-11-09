@@ -63,10 +63,10 @@ class ThermalPrinter(Serial):
         Serial.__init__(self, port, baudrate,*args,**kwargs)
         #self.wake()
         self.reset()
-        self.initialHeattime = 160
+        self.initialHeattime = 180
         
 
-    def setPrintSettings(self, heatdot=5, heattime=160, heatinterval=200): #heatime=120
+    def setPrintSettings(self, heatdot=5, heattime=180, heatinterval=200): #heatime=120
         self.writeBytes(
             27,       # Esc
             55,       # 7 (print settings)

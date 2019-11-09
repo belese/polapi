@@ -427,26 +427,29 @@ class RomanPhoto :
 
     def getBullText(self,text,length,font) :
             text_size = font.getsize(text)
-            print ('Text size :',text_size[0]," - lenght : ",length)
+            print ('Text size :',text_size[0]," - lenght : ",text_size[1],length)
             if text_size[0] + 20 > length :
                 average_char_width = (text_size[0]+20)/len(text)
                 text = textwrap.wrap(text, width=int(length/average_char_width))
-            line_height = 0
+            else :
+                text = [text]
+            bull_height = 0
             bull_width = 0
             for line in text  :
                 size = font.getsize(line)
                 bull_width = max(bull_width,size[0])
-                line_height = max(line_height,size[1])
-            print ('line height =',line_height)
+                bull_height +=size[1]
+            
             bull_width+=20
-            bull_height= (line_height*len(text)) + 20
+            bull_height+=20
             bull_img = Image.new('RGBA', (bull_width,bull_height), "white")
             bull_draw = ImageDraw.Draw(bull_img)
             y=10
             x=10
             for line in text  :
                 bull_draw.text((x, y), unicode(line), font=font,fill="black")
-                y+=line_height
+                text_size = font.getsize(unicode(line))
+                y+=text_size[1]
             return bull_img
 
 
