@@ -63,9 +63,10 @@ class ThermalPrinter(Serial):
         Serial.__init__(self, port, baudrate,*args,**kwargs)
         #self.wake()
         self.reset()
+        self.initialHeattime = 160
         
 
-    def setPrintSettings(self, heatdot=5, heattime=180, heatinterval=200): #heatime=120
+    def setPrintSettings(self, heatdot=5, heattime=160, heatinterval=200): #heatime=120
         self.writeBytes(
             27,       # Esc
             55,       # 7 (print settings)
@@ -101,6 +102,8 @@ class ThermalPrinter(Serial):
             self.prevByte = c
 
     def reset(self):
+        self._reset = True
+        time.sleep(0.1)
         self.writeBytes(27, 64)  # Esc @ = init command
         self.prevByte = '\n'  # Treat as if prior line is blank
         self.column = 0
@@ -115,6 +118,8 @@ class ThermalPrinter(Serial):
             self.writeBytes(20, 24, 28, 0)  # 0 is end-of-list.
         self.setPrintSettings()
         self.setPrintDensity()
+        time.sleep(0.1)
+        self._reset = False
 
     # Reset text formatting parameters.
     def setDefault(self):
@@ -287,7 +292,10 @@ class ThermalPrinter(Serial):
         return bitmap
 
     def printImage(self, image, LaaT=False):
-        self.reset()
+        #self.reset()
+        if self.initialHeattime > 120 :
+            #self.setPrintSettings(self.initialHeattime)
+            self.initialHeattime -= 20
         self.printBitmap(
             image.size[0],
             image.size[1],
@@ -295,7 +303,7 @@ class ThermalPrinter(Serial):
             LaaT)
 
     def streamImage(self, streamer):
-        self.reset()
+        #self.reset()
         data = streamer.get()
         total_raw = 0
         while data:
@@ -341,6 +349,8 @@ class ThermalPrinter(Serial):
             for y in range(chunkHeight):
                 #blackdotbit = 0
                 for x in range(rowBytesClipped):
+                    if self._reset :
+                        return
                     if self.writeToStdout:
                         sys.stdout.write(
                             chr(bitmap[i]))

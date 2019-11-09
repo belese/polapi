@@ -4,8 +4,7 @@ from resources.camera import CAMERA
 from resources.buttons import BUTTONS,ATTINY,ONRELEASED
 from resources.libs.romanphoto import Dialogues,RomanPhoto
 from resources.libs.facedetection import face
-from PIL import Image
-
+from PIL import Image, ImageOps
 class Romanphoto(mode):
     
     ORDER = 0
@@ -40,21 +39,26 @@ class Romanphoto(mode):
         if self.value == 1 :
             if level == 0 :
                 img = img.rotate(180, expand=1)
+                img2 = ImageOps.autocontrast(img)
+                img2 = ImageOps.equalize(img2)
                 self.canceled = False
                 self.btnshutter.enable()
                 BUZZ.buzz(TOUCHED)
-                self.faces = face(img)
+                self.faces = face(img2)
                 #self.faces = face(img) #.rotate(180, expand=1))
                 print "check faces", len(self.faces), self.dialogue.nbpersons              
                 while len(self.faces) < self.dialogue.nbpersons :
                     if self.canceled :                  
                         return None
                     BUZZ.buzz(TOUCHED)
-                    img = next(CAMERA.sequence).rotate(180, expand=1)                    
-                    self.faces = face(img)                
+                    img = next(CAMERA.sequence).rotate(180, expand=1)
+                    img2 = ImageOps.autocontrast(img)
+                    img2 = ImageOps.equalize(img2)
+                    self.faces = face(img2)                
                 self.btnshutter.disable()
                 BUZZ.buzz(OK)
             elif level == 1 :
+                print "roman photo set"
                 romanphoto = RomanPhoto(img,img.size,self.faces,self.dialogue)
                 img = romanphoto.getBubbles()
                 img = img.rotate(180, expand=1)

@@ -29,7 +29,7 @@ from urllib import unquote
 
 STEP = 10
 WIDTHMIN = 40
-HEIGHTMIN = 30
+HEIGHTMIN = 55
 
 
 class Dialogues :
@@ -55,14 +55,12 @@ class Dialogues :
                 self.title = line[1:]
             elif line[0] in self.NARRATOR :
                 self.narrator = unquote(line[1:]).decode('utf8')
-                print (self.narrator)
             elif line[0] in self.STARING :
                 self.starring.append(unquote(line[1:])).decode('utf8')
             elif line[0].isdigit()  :
                 text = unquote(line[1:]).decode('utf8')                
                 self.dialogues.append((int(line[0]),text))
                 self.nbpersons = max(int(line[0])+1,self.nbpersons)
-        print self.dialogues
 
 class RomanPhoto :
     def __init__(self,img,resolution,faces,dialogues) :
@@ -369,6 +367,10 @@ class RomanPhoto :
                 y = yr + hb/3
                 y = y if y + hb < yr + hr else yr + hr/2 - hb/2
     
+        x = x if x > 0 else 0
+        y = y if y > 0 else 0
+        x = x if x + wb < self.resolution[0] else self.resolution[0] - wb
+        y = y if y + hb < self.resolution[1] else self.resolution[1] - hb
         return (x,y)
 
     def getSquareBubble(self,text,square,face,font,wr=7,hr=3) :
@@ -425,8 +427,10 @@ class RomanPhoto :
 
     def getBullText(self,text,length,font) :
             text_size = font.getsize(text)
-            average_char_width =  1.2 * text_size[0]/len(text)
-            text = textwrap.wrap(text, width=int(length/average_char_width))
+            print ('Text size :',text_size[0]," - lenght : ",length)
+            if text_size[0] + 20 > length :
+                average_char_width = (text_size[0]+20)/len(text)
+                text = textwrap.wrap(text, width=int(length/average_char_width))
             line_height = 0
             bull_width = 0
             for line in text  :

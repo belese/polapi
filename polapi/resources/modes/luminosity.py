@@ -1,4 +1,4 @@
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageEnhance, ImageOps
 from resources.camera import CAMERA
 from resources.log import LOG
 from .imode import mode
@@ -89,20 +89,25 @@ class Luminosity(mode):
     def postProcess(self, img,level=0):
         if level == 0 :
             log("Luminosity post process")
+            img.seek(0)
             # img.save('original.jpg')
             #img = Ying_2017_CAIP(img) 
             try :
-                img = self.equalize(img)
+                #img = self.equalize(img)
+                img = ImageOps.autocontrast(img)
+                img = ImageOps.equalize(img)
             except :
-                pass
+                log("cannot set luminosity")
+                raise
+            
             img = ImageEnhance.Color(img)        
             img = img.enhance(0)
             # img.save('bw.jpg')
             img = ImageEnhance.Brightness(img)
             img = img.enhance(self.postvalue[self.value][0])
             # img.save('brightness.jpg')
-            img = ImageEnhance.Contrast(img)
-            img = img.enhance(self.postvalue[self.value][1])
+            #img = ImageEnhance.Contrast(img)
+            #img = img.enhance(self.postvalue[self.value][1])
         return img
 
     def equalize(self,im):

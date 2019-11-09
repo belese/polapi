@@ -148,7 +148,7 @@ class polapi:
         self.btnshutter.registerEvent(self.onShutterTouched, ONTOUCHED)
         self.btnshutter.registerEvent(self.onPhoto, ONRELEASED)
 
-        self.stopchineseprint.registerEvent(self.power.onForceHalt,ONPRESSED,2)
+        self.stopchineseprint.registerEvent(self.resetPrinter,ONPRESSED,2)
 
         self.buttons = [self.btnval0, self.btnval1, self.btnval2, self.btnval3]
         for button in self.buttons:
@@ -183,17 +183,24 @@ class polapi:
                 
         BUZZ.buzz(READY)
                 
+    def resetPrinter(self) :
+        BUZZ.buzz(OK)
+        PRINTER.printer.reset()
+
+    
     def onPrintManual(self) :
         print ('Print manual')
         BUZZ.buzz(OK)
-        with open('resources/manual/manual.fr.txt','r') as manual : 
+        with open('/home/pi/polapi2/polapi/resources/manual/manual.fr.txt','r') as manual : 
             for line in manual :
                 PRINTER.print_txt(line)        
 
     def onReprint(self) :
         if self._lastphoto :
             BUZZ.buzz(OK)
-            self.printPhoto(self._lastphoto) 
+            self.enhancer.disable()
+            self.stopchineseprint.enable()            
+            PRINTER.printToPage(self._lastphoto,self.onprintfinished)
         else :
             BUZZ.buzz(ERROR)
 
@@ -204,7 +211,7 @@ class polapi:
         while not self.stopped:                                                          
             img = self.enhancer.postProcess(self.picture)        
             if img is not None:            
-                img.save('roman','JPEG')
+                #img.save('roman','JPEG')
                 self.enhancer.disable()
                 self.stopchineseprint.enable()            
                 PRINTER.printToPage(img,self.onprintfinished)

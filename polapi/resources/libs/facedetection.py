@@ -3,7 +3,7 @@ import numpy
 from PIL import Image
   
 FACTOR = 0.6
-face_cascade = cv2.CascadeClassifier('resources/cascade/haarcascade_frontalface_alt2.xml')
+face_cascade = cv2.CascadeClassifier('/home/pi/polapi2/polapi/resources/cascade/haarcascade_frontalface_alt2.xml')
 clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
 
 def face(img) :
